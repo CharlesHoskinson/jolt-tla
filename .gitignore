@@ -1,0 +1,25 @@
+# TLA+ Toolbox
+*.toolbox/
+*.old
+*_TTrace.tla
+*_TTrace_*.bin
+
+# TLC output
+states/
+*.dump
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Java
+*.class
+*.jar
+
+# Temporary
+*.tmp
+*.bak
