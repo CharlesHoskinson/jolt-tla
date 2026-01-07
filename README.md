@@ -88,14 +88,14 @@ We don't just specify behavior—we specify what "secure" means, then prove it.
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│                      26 VERIFIED INVARIANTS                    │
+│                      29 VERIFIED INVARIANTS                    │
 ├────────────────────────────────────────────────────────────────┤
 │                                                                │
 │  TYPE SAFETY (4)                                               │
 │  [x] Values well-formed according to types                     │
 │  [x] No undefined behavior from malformed inputs               │
 │                                                                │
-│  CRYPTOGRAPHIC BINDING (7)                                     │
+│  CRYPTOGRAPHIC BINDING (10)                                    │
 │  [x] Program hash bound -- can't swap programs                 │
 │  [x] Memory roots bound -- can't forge state                   │
 │  [x] Config tags bound -- can't switch parameters              │
@@ -121,14 +121,17 @@ We don't just specify behavior—we specify what "secure" means, then prove it.
 
 ---
 
-## Two Specifications, Two Purposes
+## Three Verification Layers
 
-| File | What It Is | Who It's For |
-|------|-----------|--------------|
-| `JoltContinuations.tla` | Executable mathematical model (~900 lines) | Auditors, verification engineers |
+| Layer | What It Is | Who It's For |
+|-------|-----------|--------------|
+| `JoltContinuations.tla` | Executable TLA+ model (~900 lines) | Auditors, verification engineers |
+| `lean/` | Machine-checked Lean 4 proofs (~4K lines) | Formal verification, production |
 | `spec.md` | Prose specification (~40K words) | Implementers, researchers |
 
 The TLA+ spec isn't documentation. It's a model the TLC checker executes, exploring all reachable states, verifying invariants hold in each. If there's a state sequence that breaks security, TLC finds it.
+
+The Lean 4 kernel provides machine-checked proofs of the same invariants. No axiom gaps, no "sorry" placeholders—every theorem is fully proven. Build it yourself: `cd lean && lake build`.
 
 The prose spec explains decisions. Byte ordering, endianness, domain tags—details an implementer needs but that would clutter a formal model.
 
@@ -159,7 +162,7 @@ The prose spec explains decisions. Byte ordering, endianness, domain tags—deta
 # Parse
 java -cp tla2tools.jar tla2sany.SANY JoltContinuations.tla
 
-# Check all 26 invariants
+# Check all 29 invariants
 java -jar tla2tools.jar -config Jolt.cfg JoltContinuations.tla -workers auto
 ```
 
@@ -195,6 +198,11 @@ jolt-tla/
 │   ├── JoltSpec.tla         # Top-level
 │   ├── Invariants.tla       # All invariants
 │   └── MC_Jolt.tla          # Model check harness
+│
+├── lean/                       # Lean 4 verification kernel
+│   ├── NearFall/               # Source modules
+│   ├── lakefile.toml           # Build config
+│   └── README.md
 │
 ├── docs/
 │   ├── architecture.md
