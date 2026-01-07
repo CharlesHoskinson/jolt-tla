@@ -33,11 +33,17 @@ def validateNumberToken (raw : String) (value : Int) : OracleResult Unit := do
   if value > MAX_SAFE_INT || value < MIN_SAFE_INT then
     throw ErrorCode.E109_IntegerOutOfRange
 
-/-- Check if JSON value contains "TBD" placeholder string (non-recursive). -/
-def containsTBD (v : JsonValue) : Bool :=
+/-- Check if JSON value contains "TBD" placeholder string (recursive).
+
+Per §3.5: "TBD" sentinel must be detected at any JSON path. -/
+partial def containsTBD (v : JsonValue) : Bool :=
   match v with
+  | .null => false
+  | .bool _ => false
+  | .num _ => false
   | .str s => s == "TBD"
-  | _ => false  -- Simplified: only check top-level strings
+  | .arr items => items.any containsTBD
+  | .obj fields => fields.any (fun (_, val) => containsTBD val)
 
 /-- Check if string contains only ASCII characters. -/
 def isASCIIString (s : String) : Bool := s.all (·.toNat < 128)
