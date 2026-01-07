@@ -34,17 +34,26 @@ def init (cfg : Config) : SpongeState where
 /-- Get the rate (absorbable elements per permutation). -/
 def rate (s : SpongeState) : Nat := s.config.rate
 
-/-- Absorb a single field element. -/
+/-- Absorb a single field element per §8.4 absorb_fr.
+
+1. if mode == SQUEEZE: permute(); mode = ABSORB; pos = 0
+2. state[pos] += x; pos += 1
+3. if pos == r: permute(); pos = 0 -/
 def absorbOne (s : SpongeState) (x : Fr) : SpongeState :=
-  if s.mode != .Absorbing then s  -- Error: wrong mode
+  -- Step 1: If squeezing, switch to absorb mode
+  let s' := if s.mode == .Squeezing then
+    let permuted := permute s.config s.state
+    { s with state := permuted, mode := .Absorbing, pos := 0 }
+  else s
+  -- Step 2: state[pos] += x
+  let newState := s'.state.set! s'.pos (s'.state.getD s'.pos Fr.zero + x)
+  let newPos := s'.pos + 1
+  -- Step 3: if pos == r: permute(); pos = 0
+  if newPos >= s'.rate then
+    let permuted := permute s'.config newState
+    { s' with state := permuted, pos := 0 }
   else
-    let newState := s.state.set! s.pos (s.state.getD s.pos Fr.zero + x)
-    if s.pos + 1 >= s.rate then
-      -- Rate full, permute
-      let permuted := permute s.config newState
-      { s with state := permuted, pos := 0 }
-    else
-      { s with state := newState, pos := s.pos + 1 }
+    { s' with state := newState, pos := newPos }
 
 /-- Absorb multiple field elements. -/
 def absorb (s : SpongeState) (xs : Array Fr) : SpongeState := Id.run do
@@ -53,29 +62,34 @@ def absorb (s : SpongeState) (xs : Array Fr) : SpongeState := Id.run do
     st := st.absorbOne x
   return st
 
-/-- Finalize absorption and prepare for squeezing.
+/-- Finalize absorption and switch to squeezing per §8.4.
 
-Pads with 1 and permutes if needed. -/
+Per spec: if mode == ABSORB: permute(); mode = SQUEEZE; pos = 0
+NOTE: No padding is added - the spec does not specify padding. -/
 def finalize (s : SpongeState) : SpongeState :=
   if s.mode != .Absorbing then s
   else
-    -- Pad with 1
-    let padded := s.state.set! s.pos (s.state.getD s.pos Fr.zero + Fr.one)
-    -- Permute
-    let permuted := permute s.config padded
+    let permuted := permute s.config s.state
     { s with state := permuted, pos := 0, mode := .Squeezing }
 
-/-- Squeeze a single field element. -/
+/-- Squeeze a single field element per §8.4 squeeze_fr.
+
+1. if mode == ABSORB: permute(); mode = SQUEEZE; pos = 0
+2. y = state[pos]; pos += 1
+3. if pos == r: permute(); pos = 0
+4. return y -/
 def squeezeOne (s : SpongeState) : (Fr × SpongeState) :=
+  -- Step 1: If absorbing, switch to squeeze mode
   let s' := if s.mode == .Absorbing then s.finalize else s
-  if s'.pos >= s'.rate then
-    -- Need to permute for more output
+  -- Step 2: y = state[pos]
+  let result := s'.state.getD s'.pos Fr.zero
+  let newPos := s'.pos + 1
+  -- Step 3: if pos == r: permute(); pos = 0
+  if newPos >= s'.rate then
     let permuted := permute s'.config s'.state
-    let result := permuted.getD 0 Fr.zero
-    (result, { s' with state := permuted, pos := 1 })
+    (result, { s' with state := permuted, pos := 0 })
   else
-    let result := s'.state.getD s'.pos Fr.zero
-    (result, { s' with pos := s'.pos + 1 })
+    (result, { s' with pos := newPos })
 
 /-- Squeeze n field elements. -/
 def squeeze (s : SpongeState) (n : Nat) : (Array Fr × SpongeState) := Id.run do
