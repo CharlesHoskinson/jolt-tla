@@ -37,39 +37,70 @@ private def byteArrayEq (a b : ByteArray) : Bool :=
 private def containsBytes (arr : Array ByteArray) (ba : ByteArray) : Bool :=
   arr.any (fun x => byteArrayEq x ba)
 
-/-- Validate a path component.
+/-- Check if a character is a control character (0x00-0x1F). -/
+private def isControlChar (c : Char) : Bool := c.toNat < 0x20
 
-Rejects . and .. segments. -/
+/-- Validate a path component per §14.3.
+
+Rejects . and .. segments, and empty segments. -/
 def isValidPathComponent (s : String) : Bool :=
-  s != "." && s != ".."
+  !s.isEmpty && s != "." && s != ".."
 
-/-- Validate a tar member path.
+/-- Validate a tar member path per §14.3.
 
-- Reject absolute paths (starting with /)
-- Reject . and .. segments
-- Reject empty path -/
+Per spec §14.3 path normalization:
+- MUST NOT start with `/` (no absolute paths)
+- MUST NOT contain `..` or `.` path segments
+- MUST NOT contain `\\` (backslash)
+- MUST NOT contain NUL bytes or control characters
+- Empty segments between consecutive `/` are invalid
+- Directory names MUST end with `/` (validated in validateTarMember) -/
 def validatePath (path : String) : OracleResult Unit := do
   if path.isEmpty then
     throw (ErrorCode.E704_InvalidPath "empty path")
   if path.startsWith "/" then
     throw (ErrorCode.E704_InvalidPath "absolute path not allowed")
-  -- Check for . and .. segments
+  -- Check for backslash
+  if path.any (· == '\\') then
+    throw (ErrorCode.E704_InvalidPath "backslash not allowed")
+  -- Check for control characters (including NUL)
+  if path.any isControlChar then
+    throw (ErrorCode.E704_InvalidPath "control characters not allowed")
+  -- Check path segments
   let segments := path.splitOn "/"
-  for seg in segments do
-    if !seg.isEmpty && !isValidPathComponent seg then
+  -- Note: trailing '/' for directories creates an empty final segment, which is OK
+  let checkSegments := if path.endsWith "/" then segments.dropLast else segments
+  for seg in checkSegments do
+    if !isValidPathComponent seg then
       throw (ErrorCode.E704_InvalidPath s!"invalid segment '{seg}'")
 
-/-- Validate tar archive structure. -/
+/-- Validate a single tar member per §14.3. -/
+def validateTarMember (m : TarMember) : OracleResult Unit := do
+  validatePath m.name
+  -- Per §14.3: Directory member names MUST end with '/'
+  match m.type with
+  | .Directory =>
+    if !m.name.endsWith "/" then
+      throw (ErrorCode.E704_InvalidPath "directory name must end with '/'")
+    -- Directories must have size 0
+    if m.content.size != 0 then
+      throw (ErrorCode.E704_InvalidPath "directory must have size 0")
+  | .Regular =>
+    -- Regular files MUST NOT end with '/'
+    if m.name.endsWith "/" then
+      throw (ErrorCode.E704_InvalidPath "regular file name must not end with '/'")
+
+/-- Validate tar archive structure per §14.3. -/
 def validateTar (members : Array TarMember) : OracleResult Unit := do
-  -- Check paths
+  -- Check each member
   for m in members do
-    validatePath m.name
+    validateTarMember m
 
   -- Check sorted order (bytewise lexicographic on name bytes)
   if !isSortedByBytes TarMember.nameBytes members then
     throw ErrorCode.E702_UnsortedMembers
 
-  -- Check for duplicates
+  -- Check for duplicates (per §14.3: Duplicate member names MUST NOT appear)
   let mut seen : Array ByteArray := #[]
   for m in members do
     let nameB := m.nameBytes
