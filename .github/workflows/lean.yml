@@ -29,6 +29,7 @@ jobs:
         uses: leanprover/lean-action@v1
         with:
           build-args: 'NearFall Tests'
+          lake-package-directory: lean
 
       - name: Verify axiom count
         run: |
