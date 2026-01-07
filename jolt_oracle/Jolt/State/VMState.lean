@@ -38,7 +38,7 @@ instance : DecidableEq ConfigTag := fun a b =>
 
 end ConfigTag
 
-/-- RISC-V VM state (version 1).
+/-- RISC-V VM state (version 1) per §11.5.
 
 Contains all state needed for state digest computation. -/
 structure VMStateV1 where
@@ -52,11 +52,11 @@ structure VMStateV1 where
   rwMemRoot : Bytes32
   /-- I/O Merkle root -/
   ioRoot : Bytes32
-  /-- Halted flag (0 = running, 1 = halted) -/
-  halted : UInt64
-  /-- Exit code (valid only when halted) -/
+  /-- Halted flag (0 = running, 1 = halted) per §11.5 -/
+  halted : UInt8
+  /-- Exit code (valid only when halted, must be ≤ 255) -/
   exitCode : UInt64
-  /-- Config tags (prover's claim, must match registry projection) -/
+  /-- Config tags (prover's claim, must match registry projection per §3.8) -/
   configTags : Array ConfigTag
 
 namespace VMStateV1
@@ -85,12 +85,12 @@ def validateRegisterX0 (s : VMStateV1) : OracleResult Unit := do
   if s.regs[0]! != 0 then
     throw (ErrorCode.E407_RegisterX0NonZero s.regs[0]!)
 
-/-- Validate halted flag is 0 or 1. -/
+/-- Validate halted flag is 0 or 1 per §11.5. -/
 def validateHalted (s : VMStateV1) : OracleResult Unit := do
   if s.halted != 0 && s.halted != 1 then
     throw ErrorCode.E404_InvalidHalted
 
-/-- Validate termination invariants.
+/-- Validate termination invariants per §11.5.1.
 
 - halted = 0 → exit_code = 0
 - halted = 1 → exit_code ≤ 255 -/

@@ -133,9 +133,9 @@ def testRegistryKeys : IO Bool := do
   IO.println "PASS: Registry keys"
   return true
 
-/-- Test transcript tag validation. -/
+/-- Test transcript tag validation per §8.6. -/
 def testTranscriptTags : IO Bool := do
-  -- Valid tags
+  -- Valid tags (per §8.6: ASCII, [A-Z0-9/_], starts with JOLT/, length ≥ 5)
   match Transcript.validateTag "JOLT/STATE/V1" with
   | .ok _ => pure ()
   | .error _ =>
@@ -148,6 +148,14 @@ def testTranscriptTags : IO Bool := do
     IO.println "FAIL: JOLT/CONFIG_TAGS/V1 should be valid"
     return false
 
+  -- NOTE: Per §8.6, version suffix is NOT required for transcript tags!
+  -- (Version suffix is only required for registry keys per §3.3)
+  match Transcript.validateTag "JOLT/STATE" with
+  | .ok _ => pure ()  -- This IS valid per §8.6
+  | .error _ =>
+    IO.println "FAIL: JOLT/STATE should be valid (§8.6 does not require version)"
+    return false
+
   -- Invalid tags
   match Transcript.validateTag "STATE/V1" with
   | .ok _ =>
@@ -155,9 +163,9 @@ def testTranscriptTags : IO Bool := do
     return false
   | .error _ => pure ()
 
-  match Transcript.validateTag "JOLT/STATE" with
+  match Transcript.validateTag "JOLT/bad" with
   | .ok _ =>
-    IO.println "FAIL: JOLT/STATE should be invalid (no version)"
+    IO.println "FAIL: JOLT/bad should be invalid (lowercase letters)"
     return false
   | .error _ => pure ()
 

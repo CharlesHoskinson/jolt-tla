@@ -44,8 +44,8 @@ def computeStateDigest (cfg : Poseidon.Config) (programHash : Bytes32) (state : 
   -- Step 7: absorb_bytes(io_root)
   t ← absorbBytes t state.ioRoot.data
 
-  -- Step 8: absorb_u64(halted)
-  t := absorbU64 t state.halted
+  -- Step 8: absorb_u64(u64(halted)) per §11.10.2
+  t := absorbU64 t state.halted.toUInt64
 
   -- Step 9: absorb_u64(exit_code)
   t := absorbU64 t state.exitCode
@@ -54,6 +54,9 @@ def computeStateDigest (cfg : Poseidon.Config) (programHash : Bytes32) (state : 
   t ← absorbTag t "JOLT/CONFIG_TAGS/V1"
 
   -- Step 11: absorb_u64(len(config_tags))
+  -- Per STL-04: Must check n < 2^64 BEFORE UInt64 conversion
+  if state.configTags.size >= MAX_U64 then
+    throw (ErrorCode.E402_OutOfRange "config_tags count exceeds u64")
   t := absorbU64 t state.configTags.size.toUInt64
 
   -- Step 12: for each config tag

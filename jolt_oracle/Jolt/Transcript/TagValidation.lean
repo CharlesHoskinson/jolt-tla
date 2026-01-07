@@ -1,43 +1,34 @@
 import Jolt.Errors
 import Jolt.Util.ASCII
-import Jolt.Registry.KeyValidation
 
 namespace Jolt.Transcript
 
 open Jolt.ASCII
-open Jolt.Registry (findLastSubstring)
 
-/-- Validate a transcript tag.
+/-- Validate a transcript tag per §8.6.
 
-Tags must:
+Per spec §8.6, tags must:
 - Be ASCII only
-- Match charset [A-Z0-9/_]
+- Match charset [A-Z0-9/_] (uppercase, digits, forward slash, underscore)
 - Start with "JOLT/"
-- Have version suffix /V[0-9]+ -/
+- Have length ≥ 3 (implicit since "JOLT/" is already 5 chars)
+
+NOTE: §8.6 does NOT require a /V version suffix. That requirement
+applies only to registry keys (§3.3), not transcript tags. -/
 def validateTag (tag : String) : OracleResult Unit := do
   -- Must be ASCII
   if !isASCII tag then
     throw (ErrorCode.E406_InvalidTagFormat "must be ASCII")
-  -- Check all characters are valid
-  for c in tag.toList do
-    if !isTagCharASCII c then
-      throw (ErrorCode.E406_InvalidTagFormat s!"invalid char '{c}'")
+  -- Must have minimum length (prefix "JOLT/" is 5 chars, spec says ≥ 3)
+  if tag.length < 5 then
+    throw (ErrorCode.E406_InvalidTagFormat "tag too short")
   -- Must start with JOLT/
   if !tag.startsWith "JOLT/" then
     throw (ErrorCode.E406_InvalidTagFormat "must start with 'JOLT/'")
-  -- Check version suffix
-  let afterPrefix := tag.drop 5
-  match findLastSubstring afterPrefix "/V" with
-  | none =>
-    throw (ErrorCode.E406_InvalidTagFormat "must contain '/V' version suffix")
-  | some idx =>
-    -- Path between JOLT/ and /V must be non-empty
-    if afterPrefix.take idx |>.isEmpty then
-      throw (ErrorCode.E406_InvalidTagFormat "empty path")
-    -- Version after /V must be non-empty digits
-    let version := afterPrefix.drop (idx + 2)
-    if !isDigitsPlusASCII version then
-      throw (ErrorCode.E406_InvalidTagFormat "version must be digits")
+  -- Check all characters are valid [A-Z0-9/_]
+  for c in tag.toList do
+    if !isTagCharASCII c then
+      throw (ErrorCode.E406_InvalidTagFormat s!"invalid char '{c}'")
 
 /-- Check if tag is valid without throwing. -/
 def isValidTag (tag : String) : Bool :=
