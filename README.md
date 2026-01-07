@@ -2,10 +2,10 @@
 
 > **Machine-checkable security proofs for zkVM continuation semantics**
 
-[![TLA+ Verified](https://img.shields.io/badge/TLA%2B-Verified-success)]()
-[![Version](https://img.shields.io/badge/version-0.1.0-blue)]()
+[![TLA+ CI](https://github.com/CharlesHoskinson/jolt-tla/actions/workflows/tlaplus.yml/badge.svg)](https://github.com/CharlesHoskinson/jolt-tla/actions/workflows/tlaplus.yml)
+[![Lean CI](https://github.com/CharlesHoskinson/jolt-tla/actions/workflows/lean.yml/badge.svg)](https://github.com/CharlesHoskinson/jolt-tla/actions/workflows/lean.yml)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue)]()
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Spec Status](https://img.shields.io/badge/spec-Released_for_Comment-orange)]()
 
 ```
 ┌───────────────────────────────────────────────────────────────────────┐
@@ -153,8 +153,20 @@ The prose spec explains decisions. Byte ordering, endianness, domain tags—deta
 
 ### Requirements
 
-- Java 11+
-- [TLA+ tools](https://github.com/tlaplus/tlaplus/releases) (`tla2tools.jar`)
+- Java 17+
+- TLA+ tools v1.8.0 (pinned for reproducibility)
+
+### Download TLA+ Tools
+
+```bash
+# Download pinned version
+curl -fsSL -o tla2tools.jar \
+  https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar
+
+# Verify checksum (SHA256)
+# Expected: 81755d4c181ce1ea3e234c5a4537594c3112d67114508b77feed017d4b2a71aa
+sha256sum tla2tools.jar
+```
 
 ### Run the Model Checker
 
@@ -163,7 +175,8 @@ The prose spec explains decisions. Byte ordering, endianness, domain tags—deta
 java -cp tla2tools.jar tla2sany.SANY JoltContinuations.tla
 
 # Check all 29 invariants
-java -jar tla2tools.jar -config Jolt.cfg JoltContinuations.tla -workers auto
+java -XX:+UseParallelGC -Xmx4g -jar tla2tools.jar \
+  -config Jolt.cfg JoltContinuations.tla -workers auto
 ```
 
 **Expected:**
@@ -174,6 +187,10 @@ Model checking completed. No error has been found.
 
 Seven states because TLC uses small bounds (3 steps/chunk, 5 max chunks). Enough to hit all transition types. The invariants are algebraic—they don't depend on scale.
 
+### Continuous Integration
+
+Every push runs TLA+ verification via GitHub Actions. See `.github/workflows/tlaplus.yml`. Artifacts include full TLC output showing which invariants were checked.
+
 ---
 
 ## Repository Layout
@@ -183,6 +200,10 @@ jolt-tla/
 ├── JoltContinuations.tla    # <- Start here
 ├── Jolt.cfg                 # TLC configuration
 ├── spec.md                  # Full prose spec (17 sections)
+│
+├── .github/workflows/       # CI pipelines
+│   ├── tlaplus.yml          # TLA+ verification
+│   └── lean.yml             # Lean 4 build
 │
 ├── tla/                     # Modular sources
 │   ├── Types.tla            # Fr, U64, Bytes32
@@ -259,7 +280,7 @@ Tests check cases. Specifications check **all** cases. A test verifies skipping 
 
 ## Status
 
-**Released for Comment** — v0.1.0
+**Released for Comment** — v0.2.0
 
 Feature-complete. All invariants pass. Open for review before finalizing.
 

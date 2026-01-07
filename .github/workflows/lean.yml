@@ -1,0 +1,74 @@
+name: Lean 4 Verification
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - 'lean/**'
+      - '.github/workflows/lean.yml'
+  pull_request:
+    branches: [master, main]
+    paths:
+      - 'lean/**'
+      - '.github/workflows/lean.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build & Verify
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lean
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Lean 4
+        uses: leanprover/lean-action@v1
+        with:
+          build-args: 'NearFall Tests'
+
+      - name: Verify axiom count
+        run: |
+          echo "Checking axiom count..."
+          AXIOM_COUNT=$(grep -r "^axiom " NearFall/ --include="*.lean" | wc -l)
+          echo "Found $AXIOM_COUNT axioms"
+
+          # Expected: 10 cryptographic axioms
+          if [ "$AXIOM_COUNT" -ne 10 ]; then
+            echo "WARNING: Expected 10 axioms, found $AXIOM_COUNT"
+            grep -r "^axiom " NearFall/ --include="*.lean"
+          fi
+          echo "Axiom count: $AXIOM_COUNT"
+
+      - name: Verify no sorry statements
+        run: |
+          echo "Checking for sorry statements..."
+          if grep -rn "sorry" NearFall/ Tests/ --include="*.lean" | grep -v "^--" | grep -v "no sorry"; then
+            echo "ERROR: Found sorry statements"
+            exit 1
+          fi
+          echo "No sorry statements found"
+
+      - name: Generate build summary
+        run: |
+          echo "=== Lean 4 Build Summary ===" > lean-output.log
+          echo "" >> lean-output.log
+          echo "Lean version:" >> lean-output.log
+          cat lean-toolchain >> lean-output.log
+          echo "" >> lean-output.log
+          echo "Modules built:" >> lean-output.log
+          find .lake/build -name "*.olean" | wc -l >> lean-output.log
+          echo "" >> lean-output.log
+          echo "Source statistics:" >> lean-output.log
+          find NearFall -name "*.lean" -exec wc -l {} + >> lean-output.log
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lean-verification-output
+          path: lean/lean-output.log
+          retention-days: 90

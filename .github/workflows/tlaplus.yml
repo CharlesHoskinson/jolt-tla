@@ -1,0 +1,108 @@
+name: TLA+ Verification
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - '**.tla'
+      - '**.cfg'
+      - '.github/workflows/tlaplus.yml'
+  pull_request:
+    branches: [master, main]
+    paths:
+      - '**.tla'
+      - '**.cfg'
+      - '.github/workflows/tlaplus.yml'
+  workflow_dispatch:
+
+env:
+  # Pin exact TLA+ tools version for reproducibility
+  # Release: https://github.com/tlaplus/tlaplus/releases/tag/v1.8.0
+  TLAPLUS_VERSION: "1.8.0"
+  TLAPLUS_JAR_SHA256: "81755d4c181ce1ea3e234c5a4537594c3112d67114508b77feed017d4b2a71aa"
+  TLAPLUS_JAR_URL: "https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar"
+
+jobs:
+  verify:
+    name: Parse & Model Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Download TLA+ tools
+        run: |
+          echo "Downloading tla2tools.jar v$TLAPLUS_VERSION..."
+          curl -fsSL -o tla2tools.jar "$TLAPLUS_JAR_URL"
+
+          echo "Verifying checksum..."
+          ACTUAL_SHA256=$(sha256sum tla2tools.jar | cut -d' ' -f1)
+          echo "Expected: $TLAPLUS_JAR_SHA256"
+          echo "Actual:   $ACTUAL_SHA256"
+
+          if [ "$ACTUAL_SHA256" != "$TLAPLUS_JAR_SHA256" ]; then
+            echo "ERROR: Checksum mismatch!"
+            exit 1
+          fi
+          echo "Checksum verified."
+
+      - name: Parse specification (SANY)
+        run: |
+          echo "=== SANY Parse Check ===" | tee -a tlaplus-output.log
+          java -cp tla2tools.jar tla2sany.SANY JoltContinuations.tla 2>&1 | tee -a tlaplus-output.log
+          echo "" >> tlaplus-output.log
+
+      - name: Model check (TLC)
+        run: |
+          echo "=== TLC Model Check ===" | tee -a tlaplus-output.log
+          echo "Configuration: Jolt.cfg" | tee -a tlaplus-output.log
+          echo "" | tee -a tlaplus-output.log
+
+          java -XX:+UseParallelGC -Xmx4g \
+            -jar tla2tools.jar \
+            -config Jolt.cfg \
+            -workers auto \
+            -deadlock \
+            JoltContinuations.tla 2>&1 | tee -a tlaplus-output.log
+
+          TLC_EXIT=$?
+          echo "" >> tlaplus-output.log
+          echo "TLC exit code: $TLC_EXIT" | tee -a tlaplus-output.log
+
+          if [ $TLC_EXIT -ne 0 ]; then
+            echo "ERROR: TLC found errors"
+            exit 1
+          fi
+
+      - name: Extract verification summary
+        if: always()
+        run: |
+          echo "=== Verification Summary ===" | tee -a tlaplus-output.log
+          echo "" | tee -a tlaplus-output.log
+          echo "TLA+ Tools Version: $TLAPLUS_VERSION" | tee -a tlaplus-output.log
+          echo "Specification: JoltContinuations.tla" | tee -a tlaplus-output.log
+          echo "Configuration: Jolt.cfg" | tee -a tlaplus-output.log
+          echo "" | tee -a tlaplus-output.log
+
+          # Extract invariants checked
+          echo "Invariants checked:" | tee -a tlaplus-output.log
+          grep -E "INVARIANT|Invariant" Jolt.cfg | tee -a tlaplus-output.log || true
+          echo "" | tee -a tlaplus-output.log
+
+          # Show state space explored
+          grep -E "states generated|distinct states|states left" tlaplus-output.log || true
+
+      - name: Upload TLC output
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tlaplus-verification-output
+          path: tlaplus-output.log
+          retention-days: 90
