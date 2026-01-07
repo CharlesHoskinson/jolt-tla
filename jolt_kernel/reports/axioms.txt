@@ -1,0 +1,10 @@
+ConfigTags.lean:98:axiom checkConfigTags_sound (tags : ConfigTags) :
+Encoding.lean:141:axiom bytesToNatLE_natToBytesLE (n : Nat) (len : Nat) (h : n < 256^len) :
+Encoding.lean:145:axiom natToBytesLE_bytesToNatLE (bytes : List UInt8) :
+Encoding.lean:149:axiom bytesToNatLE_bound (bytes : List UInt8) :
+Encoding.lean:153:axiom bytes31_bound : 256^31 = 2^248
+Encoding.lean:166:axiom roundtrip_sound : SpecRoundTrip
+Encoding.lean:171:axiom injective_sound : SpecInjective
+Encoding.lean:174:axiom Bytes32ToFr2_succeeds (b : Bytes32) : (Bytes32ToFr2 b).isSome
+StateDigest.lean:200:axiom stateDigest_collision_resistant :
+Transcript.lean:55:axiom PoseidonPermute : Vec Fr stateWidth -> Vec Fr stateWidth

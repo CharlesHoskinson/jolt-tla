@@ -1,0 +1,216 @@
+{
+  "findings": [
+    {
+      "id": "F001",
+      "severity": "CRITICAL",
+      "confidence": "HIGH",
+      "category": "AXIOM_VIOLATION",
+      "file": "Jolt/Encoding.lean",
+      "location": {
+        "line_start": 141,
+        "line_end": 174,
+        "symbol": "multiple axioms"
+      },
+      "description": "7 unauthorized axioms in Encoding.lean bypass proof requirements. These axioms assert arithmetic properties and soundness theorems without proof, expanding the TCB and potentially hiding bugs.",
+      "axioms_involved": [
+        "bytesToNatLE_natToBytesLE (line 141)",
+        "natToBytesLE_bytesToNatLE (line 145)",
+        "bytesToNatLE_bound (line 149)",
+        "bytes31_bound (line 153)",
+        "roundtrip_sound (line 166)",
+        "injective_sound (line 171)",
+        "Bytes32ToFr2_succeeds (line 174)"
+      ],
+      "spec_reference": "KERNEL_SCOPE.md: Only PoseidonPermute allowed as axiom",
+      "evidence": {
+        "type": "grep",
+        "content": "grep -n '^axiom' Jolt/Encoding.lean returns 7 matches"
+      },
+      "recommendation": "Convert axioms to theorems with proofs. bytes31_bound (256^31=2^248) is trivially provable. Other arithmetic lemmas require induction proofs.",
+      "patch_path": null,
+      "status": "NEEDS_HUMAN",
+      "axiom_check": "FAIL"
+    },
+    {
+      "id": "F002",
+      "severity": "CRITICAL",
+      "confidence": "HIGH",
+      "category": "AXIOM_VIOLATION",
+      "file": "Jolt/ConfigTags.lean",
+      "location": {
+        "line_start": 98,
+        "line_end": 99,
+        "symbol": "checkConfigTags_sound"
+      },
+      "description": "checkConfigTags_sound is declared as axiom instead of theorem. This soundness theorem should be provable by induction on the list structure.",
+      "spec_reference": "KERNEL_SCOPE.md: Every check has check_sound theorem",
+      "evidence": {
+        "type": "snippet",
+        "content": "axiom checkConfigTags_sound (tags : ConfigTags) :\n    checkConfigTags tags = true → SpecConfigTags tags"
+      },
+      "recommendation": "Prove by induction: show checkStrictlySorted implies SpecConfigTags (pairwise ordering).",
+      "patch_path": null,
+      "status": "NEEDS_HUMAN",
+      "axiom_check": "FAIL"
+    },
+    {
+      "id": "F003",
+      "severity": "HIGH",
+      "confidence": "HIGH",
+      "category": "AXIOM_VIOLATION",
+      "file": "Jolt/StateDigest.lean",
+      "location": {
+        "line_start": 200,
+        "line_end": 203,
+        "symbol": "stateDigest_collision_resistant"
+      },
+      "description": "stateDigest_collision_resistant is axiomatized. While collision resistance is a cryptographic assumption, the documentation claims it 'follows from PoseidonPermute collision resistance'. If true, it should be proven as a theorem using the PoseidonPermute axiom.",
+      "spec_reference": "KERNEL_SCOPE.md: PoseidonPermute is the only TCB constant",
+      "evidence": {
+        "type": "snippet",
+        "content": "axiom stateDigest_collision_resistant :\n  ∀ (ph1 ph2 : Bytes32) (s1 s2 : VMStateV1),\n    stateDigestV1 ph1 s1 = stateDigestV1 ph2 s2 →\n    ph1 = ph2 ∧ s1 = s2"
+      },
+      "recommendation": "Either (1) prove this follows from PoseidonPermute, or (2) add to KERNEL_SCOPE.md as justified TCB extension with clear documentation.",
+      "patch_path": null,
+      "status": "NEEDS_HUMAN",
+      "axiom_check": "FAIL"
+    },
+    {
+      "id": "F004",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "category": "DOCUMENTATION",
+      "file": "Jolt/Kernel.lean",
+      "location": {
+        "line_start": 153,
+        "line_end": 154,
+        "symbol": "AXIOM_COUNT"
+      },
+      "description": "Kernel.lean claims AXIOM_COUNT = 1 and documents only stateDigest_collision_resistant. Actual kernel has 10 axioms (9 unauthorized + 1 PoseidonPermute).",
+      "spec_reference": "Kernel.lean lines 147-166",
+      "evidence": {
+        "type": "snippet",
+        "content": "def AXIOM_COUNT : Nat := 1\n-- Claims only stateDigest_collision_resistant\n-- Actual: 10 axioms total"
+      },
+      "recommendation": "Update documentation to reflect actual axiom count, or (preferred) fix axioms to match documentation.",
+      "patch_path": null,
+      "status": "NEEDS_HUMAN",
+      "axiom_check": "N/A"
+    },
+    {
+      "id": "F005",
+      "severity": "LOW",
+      "confidence": "HIGH",
+      "category": "BUILD",
+      "file": "Jolt/Continuations.lean",
+      "location": {
+        "line_start": 275,
+        "line_end": 515,
+        "symbol": "multiple"
+      },
+      "description": "4 compiler warnings about unused simp arguments and unused variables. These do not affect correctness but indicate suboptimal proof scripts.",
+      "warnings": [
+        "Line 275: unused simp argument Nat.add_zero",
+        "Line 355: unused simp argument List.get_cons_zero",
+        "Line 384: unused simp argument id_eq",
+        "Line 515: unused variable h_chain"
+      ],
+      "spec_reference": null,
+      "evidence": {
+        "type": "log",
+        "content": "Build warnings from lake build"
+      },
+      "recommendation": "Remove unused simp arguments and variables to clean up proofs.",
+      "patch_path": null,
+      "status": "DEFERRED",
+      "axiom_check": "N/A"
+    },
+    {
+      "id": "F006",
+      "severity": "INFO",
+      "confidence": "HIGH",
+      "category": "TESTING",
+      "file": null,
+      "location": null,
+      "description": "No spec.md found in repository. QA mapping done against KERNEL_SCOPE.md and inline documentation only.",
+      "spec_reference": null,
+      "evidence": {
+        "type": "test",
+        "content": "Test-Path spec.md returns False"
+      },
+      "recommendation": "Add spec.md or ensure KERNEL_SCOPE.md contains complete specification.",
+      "patch_path": null,
+      "status": "DEFERRED",
+      "axiom_check": "N/A"
+    },
+    {
+      "id": "F007",
+      "severity": "INFO",
+      "confidence": "HIGH",
+      "category": "TCB",
+      "file": "Jolt/Types.lean",
+      "location": {
+        "line_start": 126,
+        "line_end": 126,
+        "symbol": "Bytes32.zero"
+      },
+      "description": "native_decide used for Bytes32.zero length proof. This is acceptable usage for proving concrete facts about test data.",
+      "spec_reference": null,
+      "evidence": {
+        "type": "snippet",
+        "content": "def zero : Bytes32 := ⟨(List.replicate 32 (0 : UInt8)).toArray, by native_decide⟩"
+      },
+      "recommendation": "No action needed - acceptable use of native_decide.",
+      "patch_path": null,
+      "status": "DEFERRED",
+      "axiom_check": "PASS"
+    },
+    {
+      "id": "F008",
+      "severity": "INFO",
+      "confidence": "HIGH",
+      "category": "TCB",
+      "file": "Jolt/Wrapper.lean",
+      "location": {
+        "line_start": 373,
+        "line_end": 383,
+        "symbol": "assemblePublicInputs_ranges"
+      },
+      "description": "native_decide used 3 times for proving concrete arithmetic bounds (256 < Fr.modulus, 2^64 < Fr.modulus). This is acceptable usage.",
+      "spec_reference": null,
+      "evidence": {
+        "type": "snippet",
+        "content": "have h256 : (256 : Nat) ≤ Fr.modulus := by native_decide\nhave h264 : (2 : Nat)^64 < Fr.modulus := by native_decide"
+      },
+      "recommendation": "No action needed - acceptable use of native_decide for concrete facts.",
+      "patch_path": null,
+      "status": "DEFERRED",
+      "axiom_check": "PASS"
+    }
+  ],
+  "summary": {
+    "total": 8,
+    "by_severity": {
+      "CRITICAL": 3,
+      "HIGH": 1,
+      "MEDIUM": 1,
+      "LOW": 1,
+      "INFO": 2
+    },
+    "by_status": {
+      "APPLIED": 0,
+      "PROPOSED": 0,
+      "NEEDS_HUMAN": 4,
+      "DEFERRED": 4
+    },
+    "by_category": {
+      "AXIOM_VIOLATION": 3,
+      "DOCUMENTATION": 1,
+      "BUILD": 1,
+      "TESTING": 1,
+      "TCB": 2
+    },
+    "axiom_violations": 9,
+    "tcb_status": "VIOLATED"
+  }
+}

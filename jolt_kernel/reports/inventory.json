@@ -1,0 +1,427 @@
+{
+  "files": [
+    {
+      "file": "Jolt/Logic.lean",
+      "priority": "P1",
+      "imports": ["Jolt"],
+      "defs": [
+        {"name": "checkAll", "line": 67}
+      ],
+      "theorems": [
+        {"name": "decide_sound", "line": 35},
+        {"name": "and_sound", "line": 42},
+        {"name": "or_sound_left", "line": 48},
+        {"name": "checkAll_sound", "line": 70},
+        {"name": "check_decide_sound", "line": 78},
+        {"name": "and3_sound", "line": 86},
+        {"name": "and4_sound", "line": 91},
+        {"name": "not_true_eq_false", "line": 98},
+        {"name": "false_eq_not_true", "line": 102},
+        {"name": "beq_to_eq", "line": 108},
+        {"name": "eq_to_beq", "line": 112}
+      ],
+      "sound_theorems": [],
+      "check_defs": ["checkAll"],
+      "spec_defs": [],
+      "sorries": [],
+      "axioms": [],
+      "constants": [],
+      "opaques": []
+    },
+    {
+      "file": "Jolt/Types.lean",
+      "priority": "P0",
+      "imports": ["Jolt.Logic"],
+      "defs": [
+        {"name": "Fr.modulus", "line": 26},
+        {"name": "Fr", "line": 33},
+        {"name": "Fr.zero", "line": 38},
+        {"name": "Fr.one", "line": 41},
+        {"name": "Fr.ofNat?", "line": 44},
+        {"name": "Fr.ofNat", "line": 48},
+        {"name": "Fr.toNat", "line": 51},
+        {"name": "Fr.isZero", "line": 81},
+        {"name": "Fr.eq", "line": 84},
+        {"name": "U64", "line": 97},
+        {"name": "U64.toFr", "line": 102},
+        {"name": "U64.max", "line": 109},
+        {"name": "Bytes32", "line": 116},
+        {"name": "Bytes32.zero", "line": 126},
+        {"name": "Bytes32.get", "line": 129},
+        {"name": "Bytes32.set", "line": 133},
+        {"name": "Bytes32.toList", "line": 138},
+        {"name": "Bytes32.fromList?", "line": 141},
+        {"name": "Bytes32.fromArray?", "line": 147},
+        {"name": "Fr2", "line": 175},
+        {"name": "Fr2.isValid", "line": 189},
+        {"name": "Fr2.mk?", "line": 193},
+        {"name": "Fr2.zero", "line": 201},
+        {"name": "Vec", "line": 217},
+        {"name": "Vec.replicate", "line": 227},
+        {"name": "Vec.get", "line": 231},
+        {"name": "Vec.set", "line": 235},
+        {"name": "Vec.toList", "line": 240},
+        {"name": "RegFile", "line": 253},
+        {"name": "RegFile.initial", "line": 258},
+        {"name": "RegFile.read", "line": 261},
+        {"name": "RegFile.write", "line": 264}
+      ],
+      "theorems": [
+        {"name": "Fr.modulus_pos", "line": 30},
+        {"name": "Fr.zero_val", "line": 87},
+        {"name": "Fr.one_val", "line": 90},
+        {"name": "Bytes32.toList_length", "line": 165},
+        {"name": "RegFile.initial_x0_zero", "line": 268},
+        {"name": "RegFile.write_x0_noop", "line": 273}
+      ],
+      "sound_theorems": [],
+      "check_defs": [],
+      "spec_defs": [],
+      "sorries": [],
+      "axioms": [],
+      "constants": [],
+      "opaques": []
+    },
+    {
+      "file": "Jolt/Encoding.lean",
+      "priority": "P0",
+      "imports": ["Jolt.Types"],
+      "defs": [
+        {"name": "bytesToNatLE", "line": 43},
+        {"name": "natToBytesLE", "line": 51},
+        {"name": "Bytes32ToFr2", "line": 70},
+        {"name": "Fr2ToBytes32", "line": 93},
+        {"name": "Fr2ToBytes32'", "line": 100},
+        {"name": "SpecRoundTrip", "line": 115},
+        {"name": "SpecInjective", "line": 123},
+        {"name": "checkFr2Valid", "line": 132}
+      ],
+      "theorems": [
+        {"name": "natToBytesLE_length", "line": 58},
+        {"name": "concat_length_32", "line": 158}
+      ],
+      "sound_theorems": [
+        {"name": "roundtrip_sound", "line": 166, "status": "AXIOMATIZED"},
+        {"name": "injective_sound", "line": 171, "status": "AXIOMATIZED"}
+      ],
+      "check_defs": ["checkFr2Valid"],
+      "spec_defs": ["SpecRoundTrip", "SpecInjective"],
+      "sorries": [],
+      "axioms": [
+        {"name": "bytesToNatLE_natToBytesLE", "line": 141, "category": "ARITHMETIC"},
+        {"name": "natToBytesLE_bytesToNatLE", "line": 145, "category": "ARITHMETIC"},
+        {"name": "bytesToNatLE_bound", "line": 149, "category": "ARITHMETIC"},
+        {"name": "bytes31_bound", "line": 153, "category": "TRIVIAL_ARITHMETIC"},
+        {"name": "roundtrip_sound", "line": 166, "category": "SOUNDNESS"},
+        {"name": "injective_sound", "line": 171, "category": "SOUNDNESS"},
+        {"name": "Bytes32ToFr2_succeeds", "line": 174, "category": "TOTALITY"}
+      ],
+      "constants": [],
+      "opaques": []
+    },
+    {
+      "file": "Jolt/Transcript.lean",
+      "priority": "P0",
+      "imports": ["Jolt.Types", "Jolt.Encoding"],
+      "defs": [
+        {"name": "stateWidth", "line": 30},
+        {"name": "rate", "line": 33},
+        {"name": "capacity", "line": 36},
+        {"name": "Mode", "line": 63},
+        {"name": "TranscriptState", "line": 78},
+        {"name": "TranscriptState.init", "line": 90},
+        {"name": "TranscriptState.absorbFr", "line": 118},
+        {"name": "TranscriptState.absorbU64", "line": 127},
+        {"name": "TranscriptState.absorbFrs", "line": 131},
+        {"name": "chunkBytes31", "line": 137},
+        {"name": "bytesToFr", "line": 143},
+        {"name": "TranscriptState.absorbTag", "line": 148},
+        {"name": "TranscriptState.absorbString", "line": 154},
+        {"name": "TranscriptState.finishAbsorb", "line": 160},
+        {"name": "TranscriptState.squeezeFr", "line": 175},
+        {"name": "TranscriptState.squeezeFrs", "line": 189},
+        {"name": "PoseidonHashV1", "line": 208},
+        {"name": "PoseidonHashV1'", "line": 215},
+        {"name": "SpecTranscriptValid", "line": 221},
+        {"name": "SpecCanAbsorb", "line": 225},
+        {"name": "SpecCanSqueeze", "line": 229},
+        {"name": "checkTranscriptValid", "line": 235},
+        {"name": "checkCanAbsorb", "line": 239},
+        {"name": "checkCanSqueeze", "line": 243}
+      ],
+      "theorems": [
+        {"name": "rate_capacity_sum", "line": 39},
+        {"name": "rate_lt_stateWidth", "line": 42},
+        {"name": "init_valid", "line": 249},
+        {"name": "init_can_absorb", "line": 254},
+        {"name": "finishAbsorb_squeeze", "line": 258},
+        {"name": "squeezeFr_produces_valid_fr", "line": 264}
+      ],
+      "sound_theorems": [],
+      "check_defs": ["checkTranscriptValid", "checkCanAbsorb", "checkCanSqueeze"],
+      "spec_defs": ["SpecTranscriptValid", "SpecCanAbsorb", "SpecCanSqueeze"],
+      "sorries": [],
+      "axioms": [
+        {"name": "PoseidonPermute", "line": 55, "category": "TCB_ALLOWED"}
+      ],
+      "constants": [],
+      "opaques": []
+    },
+    {
+      "file": "Jolt/ConfigTags.lean",
+      "priority": "P0",
+      "imports": ["Jolt.Types", "Jolt.Transcript"],
+      "defs": [
+        {"name": "ConfigTag", "line": 32},
+        {"name": "ConfigTag.hashName", "line": 50},
+        {"name": "ConfigTag.hashValue", "line": 54},
+        {"name": "ConfigTags", "line": 60},
+        {"name": "utf16Lt", "line": 68},
+        {"name": "SpecConfigTags", "line": 74},
+        {"name": "checkStrictlySorted", "line": 83},
+        {"name": "checkConfigTags", "line": 90},
+        {"name": "sortTags", "line": 104},
+        {"name": "lookup", "line": 108},
+        {"name": "contains", "line": 112},
+        {"name": "hashAllNames", "line": 120},
+        {"name": "hashAllValues", "line": 126},
+        {"name": "absorbIntoTranscript", "line": 135}
+      ],
+      "theorems": [],
+      "sound_theorems": [
+        {"name": "checkConfigTags_sound", "line": 98, "status": "AXIOMATIZED"}
+      ],
+      "check_defs": ["checkStrictlySorted", "checkConfigTags"],
+      "spec_defs": ["SpecConfigTags"],
+      "sorries": [],
+      "axioms": [
+        {"name": "checkConfigTags_sound", "line": 98, "category": "SOUNDNESS"}
+      ],
+      "constants": [],
+      "opaques": []
+    },
+    {
+      "file": "Jolt/StateDigest.lean",
+      "priority": "P0",
+      "imports": ["Jolt.Types", "Jolt.Encoding", "Jolt.Transcript", "Jolt.ConfigTags"],
+      "defs": [
+        {"name": "HaltedFlag", "line": 32},
+        {"name": "HaltedFlag.toFr", "line": 42},
+        {"name": "HaltedFlag.toBool", "line": 48},
+        {"name": "ExitCode", "line": 65},
+        {"name": "EXIT_SUCCESS", "line": 68},
+        {"name": "EXIT_FAILURE", "line": 69},
+        {"name": "VMStateV1", "line": 76},
+        {"name": "VMStateV1.initial", "line": 98},
+        {"name": "VMStateV1.isHalted", "line": 110},
+        {"name": "VMStateV1.isSuccessfulHalt", "line": 113},
+        {"name": "VMStateV1.readReg", "line": 117},
+        {"name": "STATE_DIGEST_DOMAIN", "line": 136},
+        {"name": "absorbBytes32AsFr2", "line": 141},
+        {"name": "absorbRegs", "line": 147},
+        {"name": "stateDigestV1", "line": 155},
+        {"name": "SpecDeterministic", "line": 208},
+        {"name": "SpecBindsProgramHash", "line": 214},
+        {"name": "SpecBindsState", "line": 219}
+      ],
+      "theorems": [
+        {"name": "stateDigest_deterministic", "line": 226},
+        {"name": "stateDigest_binds_programHash", "line": 231},
+        {"name": "stateDigest_binds_state", "line": 238},
+        {"name": "different_programs_different_digests", "line": 247},
+        {"name": "different_states_different_digests", "line": 255}
+      ],
+      "sound_theorems": [],
+      "check_defs": [],
+      "spec_defs": ["SpecDeterministic", "SpecBindsProgramHash", "SpecBindsState"],
+      "sorries": [],
+      "axioms": [
+        {"name": "stateDigest_collision_resistant", "line": 200, "category": "CRYPTO_ASSUMPTION"}
+      ],
+      "constants": [],
+      "opaques": []
+    },
+    {
+      "file": "Jolt/Wrapper.lean",
+      "priority": "P0",
+      "imports": ["Jolt.Types", "Jolt.Encoding", "Jolt.StateDigest"],
+      "defs": [
+        {"name": "JOLT_STATUS_OK", "line": 52},
+        {"name": "JOLT_STATUS_PANIC", "line": 53},
+        {"name": "JOLT_STATUS_TIMEOUT", "line": 54},
+        {"name": "JOLT_STATUS_UNFINISHED", "line": 55},
+        {"name": "PublicInputsV1", "line": 63},
+        {"name": "PublicInputsV1.count", "line": 91},
+        {"name": "PublicInputsV1.zero", "line": 94},
+        {"name": "PublicInputsV1.toList", "line": 109},
+        {"name": "PublicInputsV1.fromList?", "line": 117},
+        {"name": "SpecRanges", "line": 161},
+        {"name": "SpecProgramHashBinding", "line": 176},
+        {"name": "SpecDigestBinding", "line": 184},
+        {"name": "SpecWrapper", "line": 190},
+        {"name": "checkRanges", "line": 199},
+        {"name": "checkDigestBinding", "line": 211},
+        {"name": "checkProgramHashBinding", "line": 217},
+        {"name": "checkWrapper", "line": 223},
+        {"name": "assemblePublicInputs", "line": 313}
+      ],
+      "theorems": [
+        {"name": "PublicInputsV1.toList_length", "line": 135},
+        {"name": "checkRanges_sound", "line": 234},
+        {"name": "checkProgramHashBinding_sound", "line": 260},
+        {"name": "checkDigestBinding_sound", "line": 277},
+        {"name": "checkWrapper_sound", "line": 289},
+        {"name": "assemblePublicInputs_ranges", "line": 349}
+      ],
+      "sound_theorems": [
+        {"name": "checkRanges_sound", "line": 234, "status": "PROVEN"},
+        {"name": "checkProgramHashBinding_sound", "line": 260, "status": "PROVEN"},
+        {"name": "checkDigestBinding_sound", "line": 277, "status": "PROVEN"},
+        {"name": "checkWrapper_sound", "line": 289, "status": "PROVEN"}
+      ],
+      "check_defs": ["checkRanges", "checkDigestBinding", "checkProgramHashBinding", "checkWrapper"],
+      "spec_defs": ["SpecRanges", "SpecProgramHashBinding", "SpecDigestBinding", "SpecWrapper"],
+      "sorries": [],
+      "axioms": [],
+      "constants": [],
+      "opaques": []
+    },
+    {
+      "file": "Jolt/Continuations.lean",
+      "priority": "P0",
+      "imports": ["Jolt.Types", "Jolt.StateDigest"],
+      "defs": [
+        {"name": "ChunkRecord", "line": 45},
+        {"name": "ChunkRecord.digestsConsistent", "line": 68},
+        {"name": "ExecutionTrace", "line": 99},
+        {"name": "ExecutionTrace.empty", "line": 113},
+        {"name": "ExecutionTrace.length", "line": 121},
+        {"name": "ExecutionTrace.firstChunk", "line": 124},
+        {"name": "ExecutionTrace.lastChunk", "line": 127},
+        {"name": "ExecutionTrace.getChunk?", "line": 130},
+        {"name": "SpecChainContinuity", "line": 146},
+        {"name": "SpecInitialBinding", "line": 153},
+        {"name": "SpecFinalBinding", "line": 161},
+        {"name": "SpecConsecutiveIndices", "line": 169},
+        {"name": "SpecSameProgramHash", "line": 176},
+        {"name": "SpecDigestsConsistent", "line": 180},
+        {"name": "SpecConfigTagsPreserved", "line": 187},
+        {"name": "SpecContinuations", "line": 191},
+        {"name": "checkChainContinuity", "line": 203},
+        {"name": "checkInitialBinding", "line": 210},
+        {"name": "checkFinalBinding", "line": 218},
+        {"name": "checkConsecutiveIndices", "line": 228},
+        {"name": "checkSameProgramHash", "line": 233},
+        {"name": "checkDigestsConsistent", "line": 237},
+        {"name": "checkConfigTagsPreserved", "line": 241},
+        {"name": "checkContinuationChain", "line": 245}
+      ],
+      "theorems": [
+        {"name": "checkChainContinuity_sound", "line": 257},
+        {"name": "checkInitialBinding_sound", "line": 284},
+        {"name": "checkFinalBinding_sound", "line": 299},
+        {"name": "list_all_get", "line": 314},
+        {"name": "list_all_mem", "line": 327},
+        {"name": "checkIndicesFrom_sound", "line": 345},
+        {"name": "zipRangeAll_to_checkFrom", "line": 364},
+        {"name": "checkConsecutiveIndices_implies_from", "line": 395},
+        {"name": "checkConsecutiveIndices_sound", "line": 408},
+        {"name": "checkSameProgramHash_sound", "line": 423},
+        {"name": "checkDigestsConsistent_sound", "line": 432},
+        {"name": "checkConfigTagsPreserved_sound", "line": 440},
+        {"name": "checkContinuationChain_sound", "line": 452},
+        {"name": "get_chunk_some", "line": 494},
+        {"name": "digestsConsistent_out", "line": 498},
+        {"name": "digestsConsistent_in", "line": 504},
+        {"name": "splice_attack_prevented", "line": 514},
+        {"name": "skip_attack_prevented", "line": 561},
+        {"name": "all_chunks_same_configTags", "line": 575},
+        {"name": "mem_get_index", "line": 653},
+        {"name": "cross_config_attack_prevented", "line": 668}
+      ],
+      "sound_theorems": [
+        {"name": "checkChainContinuity_sound", "line": 257, "status": "PROVEN"},
+        {"name": "checkInitialBinding_sound", "line": 284, "status": "PROVEN"},
+        {"name": "checkFinalBinding_sound", "line": 299, "status": "PROVEN"},
+        {"name": "checkConsecutiveIndices_sound", "line": 408, "status": "PROVEN"},
+        {"name": "checkSameProgramHash_sound", "line": 423, "status": "PROVEN"},
+        {"name": "checkDigestsConsistent_sound", "line": 432, "status": "PROVEN"},
+        {"name": "checkConfigTagsPreserved_sound", "line": 440, "status": "PROVEN"},
+        {"name": "checkContinuationChain_sound", "line": 452, "status": "PROVEN"}
+      ],
+      "check_defs": ["checkChainContinuity", "checkInitialBinding", "checkFinalBinding", "checkConsecutiveIndices", "checkSameProgramHash", "checkDigestsConsistent", "checkConfigTagsPreserved", "checkContinuationChain"],
+      "spec_defs": ["SpecChainContinuity", "SpecInitialBinding", "SpecFinalBinding", "SpecConsecutiveIndices", "SpecSameProgramHash", "SpecDigestsConsistent", "SpecConfigTagsPreserved", "SpecContinuations"],
+      "sorries": [],
+      "axioms": [],
+      "constants": [],
+      "opaques": []
+    },
+    {
+      "file": "Jolt/Kernel.lean",
+      "priority": "P1",
+      "imports": ["Jolt.Types", "Jolt.Encoding", "Jolt.Transcript", "Jolt.ConfigTags", "Jolt.StateDigest", "Jolt.Wrapper", "Jolt.Continuations"],
+      "defs": [
+        {"name": "AXIOM_COUNT", "line": 153},
+        {"name": "AxiomManifest", "line": 167},
+        {"name": "TCBSummary", "line": 188}
+      ],
+      "theorems": [
+        {"name": "encoding_roundtrip_sound", "line": 105},
+        {"name": "encoding_injective", "line": 111},
+        {"name": "configTags_sound", "line": 117},
+        {"name": "wrapper_sound", "line": 125},
+        {"name": "continuations_sound", "line": 133},
+        {"name": "stateDigest_deterministic", "line": 141},
+        {"name": "valid_trace_is_secure", "line": 204},
+        {"name": "valid_wrapper_is_bound", "line": 215}
+      ],
+      "sound_theorems": [],
+      "check_defs": [],
+      "spec_defs": [],
+      "sorries": [],
+      "axioms": [],
+      "constants": [],
+      "opaques": [],
+      "notes": "Re-exports from other modules. Documentation claims 1 axiom but kernel uses 10."
+    }
+  ],
+  "summary": {
+    "total_files": 9,
+    "total_sorries": 0,
+    "total_axioms": 10,
+    "authorized_axioms": 1,
+    "unauthorized_axioms": 9,
+    "total_constants": 0,
+    "total_opaques": 0,
+    "tcb_surface": 10,
+    "sound_theorems_proven": 12,
+    "sound_theorems_axiomatized": 4,
+    "check_defs": 17,
+    "spec_defs": 17
+  },
+  "axiom_breakdown": {
+    "allowed": [
+      {"name": "PoseidonPermute", "file": "Transcript.lean", "line": 55}
+    ],
+    "unauthorized_provable": [
+      {"name": "bytesToNatLE_natToBytesLE", "file": "Encoding.lean", "line": 141, "difficulty": "INDUCTION"},
+      {"name": "natToBytesLE_bytesToNatLE", "file": "Encoding.lean", "line": 145, "difficulty": "INDUCTION"},
+      {"name": "bytesToNatLE_bound", "file": "Encoding.lean", "line": 149, "difficulty": "INDUCTION"},
+      {"name": "bytes31_bound", "file": "Encoding.lean", "line": 153, "difficulty": "TRIVIAL"},
+      {"name": "roundtrip_sound", "file": "Encoding.lean", "line": 166, "difficulty": "DEPENDS_ON_ARITHMETIC"},
+      {"name": "injective_sound", "file": "Encoding.lean", "line": 171, "difficulty": "DEPENDS_ON_ARITHMETIC"},
+      {"name": "Bytes32ToFr2_succeeds", "file": "Encoding.lean", "line": 174, "difficulty": "DEPENDS_ON_ARITHMETIC"},
+      {"name": "checkConfigTags_sound", "file": "ConfigTags.lean", "line": 98, "difficulty": "INDUCTION"}
+    ],
+    "unauthorized_crypto": [
+      {"name": "stateDigest_collision_resistant", "file": "StateDigest.lean", "line": 200, "difficulty": "CRYPTO_ASSUMPTION"}
+    ]
+  },
+  "gates": {
+    "GATE_A_sorry_in_P0": false,
+    "GATE_B_unauthorized_axioms": true,
+    "GATE_B_count": 9,
+    "GATE_C_spec_divergence": "UNKNOWN",
+    "GATE_D_soundness_break": "UNKNOWN"
+  }
+}

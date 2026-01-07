@@ -1,0 +1,20 @@
+name: CI
+on: [push, pull_request]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: leanprover/lean-action@v1
+        with:
+          build: true
+          test: true
+      - name: Check no sorries in Kernel
+        run: |
+          if grep -r "sorry" Jolt/Kernel.lean; then
+            echo "ERROR: sorry found in Kernel.lean"
+            exit 1
+          fi
+      - name: Audit axioms
+        run: |
+          lake env lean -c '#print axioms Jolt.Kernel.wrapper_sound'

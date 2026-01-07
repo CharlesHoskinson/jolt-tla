@@ -1,0 +1,20 @@
+{
+  "timestamp_utc": "2026-01-06T00:00:00Z",
+  "lean_toolchain": "leanprover/lean4:v4.26.0",
+  "lean_version_parsed": "4.26.0",
+  "lean_4_26_compatible": true,
+  "git_head": "602437fee3dd94769d80fd395195dd18e2420d99",
+  "spec_md_exists": false,
+  "spec_md_sha256": null,
+  "kernel_scope_sha256": "52cc0419e828e959121983e6f48791555506ae6d97c322a506fea5cfb1fb0a16",
+  "allowed_axioms": ["PoseidonPermute"],
+  "p0_file_hashes": {
+    "Jolt/Types.lean": "fe2734010d1fbab9afe6f8575cb9733f6929b1a9c6ec30302f7beed2f45afb7c",
+    "Jolt/Encoding.lean": "3cd57e6079d1c475cf314dc4f98349c02e91aaaea06ba286679ff3069a1b966b",
+    "Jolt/Transcript.lean": "3fe57387c68b34f6d0233b8f727807675f226822bcfbca16ba5843603e41ba27",
+    "Jolt/ConfigTags.lean": "dbe1c509e75b114848bd854a8238098ea25a1220c81a9dbbe41263cd5bf3b918",
+    "Jolt/StateDigest.lean": "f3a9fd5755a95ed1e7501f35d2a4b6be143e53fbf336022f917cbe2e52dfc194",
+    "Jolt/Wrapper.lean": "33a8fde9863ff62d3fd6a64ebf79cc88fda28e0b16267b9458fd32b75158111e",
+    "Jolt/Continuations.lean": "304c332cf9371088d7d4ca96a19099ca06c16dedba725d646f1b89b83e80f07c"
+  }
+}

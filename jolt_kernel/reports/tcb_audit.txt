@@ -1,0 +1,59 @@
+=== JOLT KERNEL TCB AUDIT ===
+Date: 2026-01-06
+Lean Version: 4.26.0
+
+=== AXIOMS/CONSTANTS/OPAQUES ===
+ALLOWED (per KERNEL_SCOPE.md):
+- Transcript.lean:55: axiom PoseidonPermute : Vec Fr stateWidth -> Vec Fr stateWidth
+
+UNAUTHORIZED (9 total):
+- Encoding.lean:141: axiom bytesToNatLE_natToBytesLE
+- Encoding.lean:145: axiom natToBytesLE_bytesToNatLE
+- Encoding.lean:149: axiom bytesToNatLE_bound
+- Encoding.lean:153: axiom bytes31_bound : 256^31 = 2^248
+- Encoding.lean:166: axiom roundtrip_sound : SpecRoundTrip
+- Encoding.lean:171: axiom injective_sound : SpecInjective
+- Encoding.lean:174: axiom Bytes32ToFr2_succeeds
+- ConfigTags.lean:98: axiom checkConfigTags_sound
+- StateDigest.lean:200: axiom stateDigest_collision_resistant
+
+=== NATIVE_DECIDE (proof computation bypass) ===
+- Types.lean:126: used for Bytes32.zero initialization (ACCEPTABLE - test data)
+- Wrapper.lean:373: used for status bound proof (ACCEPTABLE - concrete arithmetic)
+- Wrapper.lean:375: used for 256 < Fr.modulus (ACCEPTABLE - concrete arithmetic)
+- Wrapper.lean:383: used for 2^64 < Fr.modulus (ACCEPTABLE - concrete arithmetic)
+
+=== IMPLEMENTED_BY (unverified impl) ===
+(none found)
+
+=== UNSAFE (in non-FFI code) ===
+(none found)
+
+=== SUMMARY ===
+TCB Surface: 10 axioms total
+- Allowed: 1 (PoseidonPermute)
+- Unauthorized: 9
+
+GATE B STATUS: ⛔ TRIGGERED
+The kernel contains 9 unauthorized axioms.
+These MUST be converted to theorems or documented as sorry + NEEDS_HUMAN.
+
+=== AXIOM CLASSIFICATION ===
+
+Category 1: TRIVIALLY PROVABLE (should fix immediately)
+- bytes31_bound: 256^31 = 2^248 is a concrete arithmetic fact
+
+Category 2: PROVABLE BY INDUCTION (should fix)
+- bytesToNatLE_natToBytesLE: roundtrip property
+- natToBytesLE_bytesToNatLE: inverse roundtrip
+- bytesToNatLE_bound: bound property
+- checkConfigTags_sound: induction over list
+
+Category 3: DEPENDS ON OTHER PROOFS (fix after Category 2)
+- roundtrip_sound: uses byte conversion lemmas
+- injective_sound: uses byte conversion lemmas
+- Bytes32ToFr2_succeeds: uses bound properties
+
+Category 4: CRYPTOGRAPHIC ASSUMPTION (may need to remain as axiom)
+- stateDigest_collision_resistant: follows from hash collision resistance
+  HOWEVER: this should be proven FROM PoseidonPermute, not added as new axiom
