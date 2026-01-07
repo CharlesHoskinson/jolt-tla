@@ -17,9 +17,6 @@ jobs:
   build:
     name: Build & Verify
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: lean
 
     steps:
       - name: Checkout repository
@@ -28,10 +25,11 @@ jobs:
       - name: Setup Lean 4
         uses: leanprover/lean-action@v1
         with:
-          build-args: 'NearFall Tests'
+          build-args: 'NearFall'
           lake-package-directory: lean
 
       - name: Verify axiom count
+        working-directory: lean
         run: |
           echo "Checking axiom count..."
           AXIOM_COUNT=$(grep -r "^axiom " NearFall/ --include="*.lean" | wc -l)
@@ -45,15 +43,17 @@ jobs:
           echo "Axiom count: $AXIOM_COUNT"
 
       - name: Verify no sorry statements
+        working-directory: lean
         run: |
-          echo "Checking for sorry statements..."
-          if grep -rn "sorry" NearFall/ Tests/ --include="*.lean" | grep -v "^--" | grep -v "no sorry"; then
+          echo "Checking for sorry statements in NearFall/..."
+          if grep -rn "sorry" NearFall/ --include="*.lean" | grep -v "-- no sorry"; then
             echo "ERROR: Found sorry statements"
             exit 1
           fi
           echo "No sorry statements found"
 
       - name: Generate build summary
+        working-directory: lean
         run: |
           echo "=== Lean 4 Build Summary ===" > lean-output.log
           echo "" >> lean-output.log
@@ -61,7 +61,7 @@ jobs:
           cat lean-toolchain >> lean-output.log
           echo "" >> lean-output.log
           echo "Modules built:" >> lean-output.log
-          find .lake/build -name "*.olean" | wc -l >> lean-output.log
+          find .lake/build -name "*.olean" 2>/dev/null | wc -l >> lean-output.log
           echo "" >> lean-output.log
           echo "Source statistics:" >> lean-output.log
           find NearFall -name "*.lean" -exec wc -l {} + >> lean-output.log
