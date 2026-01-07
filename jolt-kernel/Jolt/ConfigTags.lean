@@ -107,10 +107,13 @@ theorem checkStrictlySorted_adjacent {a b : ConfigTag} {rest : List ConfigTag}
   exact h.1
 
 /-- Helper: transitivity of utf16Lt (follows from String.lt transitivity). -/
-theorem utf16Lt_trans {s1 s2 s3 : String} (h1 : utf16Lt s1 s2) (h2 : utf16Lt s2 s3) :
-    utf16Lt s1 s3 := by
+theorem utf16Lt_trans {s1 s2 s3 : String} (h1 : utf16Lt s1 s2 = true) (h2 : utf16Lt s2 s3 = true) :
+    utf16Lt s1 s3 = true := by
   simp only [utf16Lt] at *
-  exact String.lt_trans h1 h2
+  -- Convert Bool equality to Prop
+  have h1' : s1 < s2 := of_decide_eq_true h1
+  have h2' : s2 < s3 := of_decide_eq_true h2
+  exact decide_eq_true (String.lt_trans h1' h2')
 
 /-- Helper: checkStrictlySorted implies index-based ordering.
 
@@ -159,6 +162,13 @@ theorem checkStrictlySorted_spec (tags : ConfigTags) (h : checkStrictlySorted ta
       | succ i' =>
         -- i > 0, use induction on tail
         simp only [List.getD_cons_succ]
+        -- Need to show j-th element of (a :: b :: rest') equals (j-1)-th of (b :: rest')
+        have hj_pos : j ≥ 1 := by omega
+        have hgetD_eq : (a :: b :: rest').getD j default = (b :: rest').getD (j - 1) default := by
+          cases j with
+          | zero => omega
+          | succ j' => simp only [List.getD_cons_succ, Nat.add_sub_cancel]
+        rw [hgetD_eq]
         apply h_tail_spec i' (j - 1)
         · omega
         · simp only [List.length_cons] at hj ⊢; omega

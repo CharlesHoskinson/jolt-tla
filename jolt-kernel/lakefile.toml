@@ -1,4 +1,4 @@
-name = "jolt_kernel"
+name = "jolt-kernel"
 version = "0.1.0"
 keywords = ["formal-verification", "zkvm", "lean4", "jolt"]
 description = "Minimal auditable Lean 4 kernel for Jolt zkVM"
@@ -21,5 +21,5 @@ roots = ["Tests"]
 globs = ["Tests"]
 
 [[lean_exe]]
-name = "jolt_test"
+name = "jolt-test"
 root = "Tests.Main"

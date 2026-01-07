@@ -149,9 +149,12 @@ theorem bytesToNatLE_natToBytesLE (n : Nat) (len : Nat) (h : n < 256^len) :
     -- natToBytesLE n (k+1) = (n % 256) :: natToBytesLE (n / 256) k
     simp only [natToBytesLE, bytesToNatLE]
     -- (UInt8.ofNat (n % 256)).toNat = n % 256
+    have hmod_lt : n % 256 < 256 := Nat.mod_lt n (by omega)
     have hmod : (UInt8.ofNat (n % 256)).toNat = n % 256 := by
-      simp only [UInt8.toNat_ofNat]
-      exact Nat.mod_mod_of_dvd n (by decide : 256 ∣ UInt8.size)
+      have h1 : (UInt8.ofNat (n % 256)).toNat = (n % 256) % UInt8.size := UInt8.toNat_ofNat
+      have h2 : UInt8.size = 256 := rfl
+      rw [h1, h2]
+      exact Nat.mod_eq_of_lt hmod_lt
     rw [hmod]
     -- n / 256 < 256^k (needed for IH)
     have hdiv : n / 256 < 256^k := by
@@ -161,7 +164,7 @@ theorem bytesToNatLE_natToBytesLE (n : Nat) (len : Nat) (h : n < 256^len) :
     -- Apply IH
     rw [ih (n / 256) hdiv]
     -- n % 256 + 256 * (n / 256) = n
-    exact Nat.mod_add_div' n 256
+    omega
 
 /-- THEOREM: natToBytesLE of bytesToNatLE roundtrip.
 
@@ -179,16 +182,15 @@ theorem natToBytesLE_bytesToNatLE (bytes : List UInt8) :
       simp only [UInt8.size] at this
       exact this
     have hmod : (b.toNat + 256 * bytesToNatLE bs) % 256 = b.toNat := by
-      rw [Nat.add_mul_mod_self_right]
+      rw [Nat.add_mul_mod_self_left]
       exact Nat.mod_eq_of_lt hb_lt
     -- n / 256 = bytesToNatLE bs
     have hdiv : (b.toNat + 256 * bytesToNatLE bs) / 256 = bytesToNatLE bs := by
-      rw [Nat.add_mul_div_right _ _ (by omega : 0 < 256)]
+      rw [Nat.add_mul_div_left _ _ (by omega : 0 < 256)]
       simp only [Nat.div_eq_of_lt hb_lt, Nat.zero_add]
     rw [hmod, hdiv]
     -- UInt8.ofNat b.toNat = b
-    have hid : UInt8.ofNat b.toNat = b := UInt8.ofNat_toNat b
-    rw [hid, ih]
+    rw [UInt8.ofNat_toNat, ih]
 
 /-- THEOREM: bytesToNatLE is bounded by 256^len.
 
@@ -227,93 +229,39 @@ theorem concat_length_32 (lo_bytes : List UInt8) (hi_byte : UInt8)
 /-- Helper: take 31 ++ [get 31] = original for 32-element list. -/
 theorem take31_append_get31 {α : Type} (xs : List α) (h : xs.length = 32) (default : α) :
     xs.take 31 ++ [xs.getD 31 default] = xs := by
-  have hget : xs.getD 31 default = xs.get ⟨31, by omega⟩ := by
-    simp only [List.getD_eq_getElem?, List.getElem?_eq_getElem (by omega : 31 < xs.length)]
-    rfl
+  have hlt : 31 < xs.length := by omega
+  -- getD equals get when index is in bounds
+  have hget : xs.getD 31 default = xs[31]'hlt := by
+    unfold List.getD
+    simp only [List.getElem?_eq_getElem hlt, Option.getD_some]
   rw [hget]
-  conv_rhs => rw [← List.take_append_drop 31 xs]
-  congr 1
-  -- drop 31 of 32-element list is [get 31]
+  -- drop 31 of 32-element list is [xs[31]]
   have hdrop_len : (xs.drop 31).length = 1 := by simp [h]
-  have hdrop_get : (xs.drop 31).get ⟨0, by omega⟩ = xs.get ⟨31, by omega⟩ := by
-    simp only [List.get_drop']
-  match hd : xs.drop 31 with
-  | [] => simp at hdrop_len
-  | [a] =>
-    congr 1
-    have : a = (xs.drop 31).get ⟨0, by simp [hd]⟩ := by simp [hd]
-    rw [this, hdrop_get]
-  | _ :: _ :: _ => simp at hdrop_len
+  have hdrop_eq : xs.drop 31 = [xs[31]'hlt] := by
+    match hd : xs.drop 31 with
+    | [] =>
+      -- Impossible: drop has length 1, not 0
+      have : ([] : List α).length = 1 := by rw [← hd]; exact hdrop_len
+      simp at this
+    | [a] =>
+      congr 1
+      have h0 : a = (xs.drop 31)[0]'(by omega) := by simp [hd]
+      rw [h0, List.getElem_drop]
+    | b :: c :: rest =>
+      -- Impossible: drop has length 1, not 2+
+      have hlen : (b :: c :: rest).length = 1 := by rw [← hd]; exact hdrop_len
+      simp at hlen
+  -- Rewrite using take_append_drop
+  calc xs.take 31 ++ [xs[31]'hlt]
+      = xs.take 31 ++ xs.drop 31 := by rw [hdrop_eq]
+    _ = xs := List.take_append_drop 31 xs
 
 /-- Helper: fromList? ∘ toList = some for Bytes32. -/
 theorem Bytes32_fromList_toList (b : Bytes32) :
     Bytes32.fromList? b.toList = some b := by
-  simp only [Bytes32.fromList?, Bytes32.toList_length, ↓reduceDIte]
-  simp only [Bytes32.toList, Array.toList_toArray]
-  rfl
-
-/-- THEOREM: Round-trip soundness.
-
-Fr2ToBytes32 (Bytes32ToFr2 b) = some b. -/
-theorem roundtrip_sound : SpecRoundTrip := by
-  intro b
-  -- We know Bytes32ToFr2 b succeeds
-  have hsucceeds := Bytes32ToFr2_succeeds b
-  simp only [Option.isSome_iff_exists] at hsucceeds
-  obtain ⟨fr2, hfr2⟩ := hsucceeds
-  simp only [hfr2]
-  -- Unfold Fr2ToBytes32
-  unfold Fr2ToBytes32
-  -- Get the lo and hi values from the encoding
-  unfold Bytes32ToFr2 at hfr2
-  simp only [] at hfr2
-  -- Extract the conditions
-  have hlen32 := b.toList_length
-  split at hfr2
-  · rename_i hlo_mod
-    split at hfr2
-    · rename_i hlo_bound
-      split at hfr2
-      · rename_i hhi_bound
-        -- fr2 is the encoded value
-        injection hfr2 with hfr2_eq
-        simp only [← hfr2_eq]
-        -- lo_bytes = natToBytesLE (bytesToNatLE (b.toList.take 31)) 31
-        -- hi_byte = UInt8.ofNat (b.toList.getD 31 0).toNat
-        have hlo_len : (b.toList.take 31).length = 31 := take31_of_32 b.toList hlen32
-        have hlo_roundtrip : natToBytesLE (bytesToNatLE (b.toList.take 31)) 31 = b.toList.take 31 := by
-          have h := natToBytesLE_bytesToNatLE (b.toList.take 31)
-          rw [hlo_len] at h
-          exact h
-        have hhi_roundtrip : UInt8.ofNat (b.toList.getD 31 0).toNat = b.toList.getD 31 0 :=
-          UInt8.ofNat_toNat _
-        simp only [hlo_roundtrip, hhi_roundtrip]
-        -- Now need: Bytes32.fromList? (b.toList.take 31 ++ [b.toList.getD 31 0]) = some b
-        have hconcat := take31_append_get31 b.toList hlen32 0
-        rw [hconcat]
-        exact Bytes32_fromList_toList b
-      · simp at hfr2
-    · simp at hfr2
-  · simp at hfr2
-
-/-- THEOREM: Encoding is injective.
-
-If Bytes32ToFr2 a = Bytes32ToFr2 b, then a = b.
-Proof: Apply round-trip to both sides. -/
-theorem injective_sound : SpecInjective := by
-  intro a b heq hisSome
-  -- Both encode to the same fr2
-  simp only [Option.isSome_iff_exists] at hisSome
-  obtain ⟨fr2, hfr2_a⟩ := hisSome
-  have hfr2_b : Bytes32ToFr2 b = some fr2 := by rw [← heq]; exact hfr2_a
-  -- Apply roundtrip_sound to both
-  have ha := roundtrip_sound a
-  have hb := roundtrip_sound b
-  simp only [hfr2_a] at ha
-  simp only [hfr2_b] at hb
-  -- Fr2ToBytes32 fr2 = some a and Fr2ToBytes32 fr2 = some b
-  rw [ha] at hb
-  injection hb
+  unfold Bytes32.fromList? Bytes32.toList
+  have hlen : b.data.toList.length = 32 := by simp [b.h_len]
+  simp only [dif_pos hlen, Array.toArray_toList]
 
 /-- Helper: 2^248 < Fr.modulus. -/
 theorem pow248_lt_modulus : (2 : Nat)^248 < Fr.modulus := by native_decide
@@ -361,5 +309,68 @@ theorem Bytes32ToFr2_succeeds (b : Bytes32) : (Bytes32ToFr2 b).isSome := by
   -- hi_nat < 256
   have hhi_bound := hi_nat_bound (b.toList.getD 31 0)
   simp only [hlo_mod, hlo_bound, hhi_bound, ↓reduceDIte, Option.isSome_some]
+
+/-- THEOREM: Round-trip soundness.
+
+Fr2ToBytes32 (Bytes32ToFr2 b) = some b. -/
+theorem roundtrip_sound : SpecRoundTrip := by
+  intro b
+  -- We know Bytes32ToFr2 b succeeds
+  have hsucceeds := Bytes32ToFr2_succeeds b
+  simp only [Option.isSome_iff_exists] at hsucceeds
+  obtain ⟨fr2, hfr2⟩ := hsucceeds
+  simp only [hfr2]
+  -- Unfold Fr2ToBytes32
+  unfold Fr2ToBytes32
+  -- Get the lo and hi values from the encoding
+  unfold Bytes32ToFr2 at hfr2
+  simp only [] at hfr2
+  -- Extract the conditions
+  have hlen32 := b.toList_length
+  split at hfr2
+  · rename_i hlo_mod
+    split at hfr2
+    · rename_i hlo_bound
+      split at hfr2
+      · rename_i hhi_bound
+        -- fr2 is the encoded value
+        injection hfr2 with hfr2_eq
+        simp only [← hfr2_eq]
+        -- lo_bytes = natToBytesLE (bytesToNatLE (b.toList.take 31)) 31
+        -- hi_byte = UInt8.ofNat (b.toList.getD 31 0).toNat
+        have hlo_len : (b.toList.take 31).length = 31 := take31_of_32 b.toList hlen32
+        have hlo_roundtrip : natToBytesLE (bytesToNatLE (b.toList.take 31)) 31 = b.toList.take 31 := by
+          have h := natToBytesLE_bytesToNatLE (b.toList.take 31)
+          rw [hlo_len] at h
+          exact h
+        have hhi_roundtrip : UInt8.ofNat (b.toList.getD 31 0).toNat = b.toList.getD 31 0 :=
+          UInt8.ofNat_toNat
+        simp only [hlo_roundtrip, hhi_roundtrip]
+        -- Now need: Bytes32.fromList? (b.toList.take 31 ++ [b.toList.getD 31 0]) = some b
+        have hconcat := take31_append_get31 b.toList hlen32 0
+        rw [hconcat]
+        exact Bytes32_fromList_toList b
+      · simp at hfr2
+    · simp at hfr2
+  · simp at hfr2
+
+/-- THEOREM: Encoding is injective.
+
+If Bytes32ToFr2 a = Bytes32ToFr2 b, then a = b.
+Proof: Apply round-trip to both sides. -/
+theorem injective_sound : SpecInjective := by
+  intro a b heq hisSome
+  -- Both encode to the same fr2
+  simp only [Option.isSome_iff_exists] at hisSome
+  obtain ⟨fr2, hfr2_a⟩ := hisSome
+  have hfr2_b : Bytes32ToFr2 b = some fr2 := by rw [← heq]; exact hfr2_a
+  -- Apply roundtrip_sound to both
+  have ha := roundtrip_sound a
+  have hb := roundtrip_sound b
+  simp only [hfr2_a] at ha
+  simp only [hfr2_b] at hb
+  -- Fr2ToBytes32 fr2 = some a and Fr2ToBytes32 fr2 = some b
+  rw [ha] at hb
+  injection hb
 
 end Jolt.Encoding
