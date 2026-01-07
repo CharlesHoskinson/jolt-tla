@@ -158,9 +158,8 @@ theorem checkSystemInvariants_decompose (sys : SystemState)
 
 /-- checkHaltedBinary pass implies HaltedFlag is valid. -/
 theorem checkHaltedBinary_implies_valid (state : VMStateV1)
-    (h : checkHaltedBinary state = .ok) :
+    (_h : checkHaltedBinary state = .ok) :
     haltedFlagValid state := by
-  simp only [checkHaltedBinary] at h
   simp only [haltedFlagValid]
   cases state.halted with
   | running => left; rfl
@@ -168,15 +167,10 @@ theorem checkHaltedBinary_implies_valid (state : VMStateV1)
 
 /-- checkRegisterX0 pass implies register x0 is zero. -/
 theorem checkRegisterX0_implies_valid (state : VMStateV1)
-    (h : checkRegisterX0 state = .ok) :
+    (_h : checkRegisterX0 state = .ok) :
     registerX0Zero state := by
-  simp only [checkRegisterX0] at h
   simp only [registerX0Zero]
-  split at h <;> try contradiction
-  rename_i h_cond
-  -- h_cond : (state.regs.read REG_X0 == 0) = true
-  simp only [BEq.beq, decide_eq_true_eq] at h_cond
-  exact h_cond
+  exact read_x0_zero state.regs
 
 /-- checkVMHaltedExitCode pass implies exit code semantics. -/
 theorem checkVMHaltedExitCode_implies_valid (state : VMStateV1)
@@ -558,8 +552,7 @@ theorem list_all_zip_succ_range {α : Type} (l : List α) (P : α → Nat → Bo
     (i : Nat) (h_i : i < l.length) :
     P (l.get ⟨i, h_i⟩) (i + 1) = true := by
   -- Nat.succ = (· + 1), so this is list_all_zip_offset_range with k = 1
-  have h_eq : List.map Nat.succ (List.range l.length) = List.map (· + 1) (List.range l.length) := by
-    simp only [Nat.succ_eq_add_one]
+  have h_eq : List.map Nat.succ (List.range l.length) = List.map (· + 1) (List.range l.length) := rfl
   rw [h_eq] at h
   exact list_all_zip_offset_range l 1 P h i h_i
 

@@ -140,7 +140,7 @@ def getBit (n : UInt32) (pos : Nat) : UInt32 :=
 
 At depth d, we use bit (31 - d): MSB first.
 Returns 0 for left, 1 for right. -/
-def branchDirection (k : UInt32) (d : Nat) (h : d < 32 := by decide) : UInt32 :=
+def branchDirection (k : UInt32) (d : Nat) (_h : d < 32 := by decide) : UInt32 :=
   getBit k (31 - d)
 
 /-! ### SMT State Record -/

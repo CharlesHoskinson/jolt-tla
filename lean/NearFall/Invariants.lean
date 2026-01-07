@@ -110,7 +110,7 @@ instance : Inhabited SystemState where
 /-- INV_TYPE_SystemState: System state has valid types.
 
 **TLA+**: `sys.phase ∈ SystemPhase ∧ sys.batchNonce ∈ U64` -/
-def INV_TYPE_SystemState (sys : SystemState) : Prop :=
+def INV_TYPE_SystemState (_sys : SystemState) : Prop :=
   True  -- Phase is always valid by construction in Lean
 
 /-- INV_TYPE_VMState: VM state has valid types.
