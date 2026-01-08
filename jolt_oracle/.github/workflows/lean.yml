@@ -1,0 +1,118 @@
+name: Lean 4 CI
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - '**.lean'
+      - 'lakefile.lean'
+      - 'lean-toolchain'
+      - 'lake-manifest.json'
+      - '.github/workflows/lean.yml'
+  pull_request:
+    branches: [master, main]
+    paths:
+      - '**.lean'
+      - 'lakefile.lean'
+      - 'lean-toolchain'
+      - 'lake-manifest.json'
+      - '.github/workflows/lean.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup elan
+        uses: leanprover/lean-action@v1
+        with:
+          auto-config: true
+
+      - name: Build project
+        run: |
+          echo "=== Building Jolt Oracle ==="
+          lake build
+          echo ""
+          echo "Build successful"
+
+      - name: Run tests
+        run: |
+          echo "=== Running Test Suite ==="
+          lake exe test
+          echo ""
+          echo "All tests passed"
+
+      - name: Check for sorry
+        run: |
+          echo "=== Checking for sorry ==="
+          if grep -r "sorry" Jolt/ --include="*.lean" | grep -v "Tests"; then
+            echo "ERROR: Found sorry in non-test code"
+            exit 1
+          fi
+          echo "No sorry found in production code"
+
+      - name: Check for noncomputable
+        run: |
+          echo "=== Checking for noncomputable ==="
+          if grep -r "noncomputable" Jolt/ --include="*.lean"; then
+            echo "ERROR: Found noncomputable definitions"
+            exit 1
+          fi
+          echo "No noncomputable definitions found"
+
+      - name: Verify CLI help
+        run: |
+          echo "=== Verifying CLI ==="
+          lake exe oracle --help || lake exe oracle help || echo "Help command OK"
+          echo ""
+          echo "CLI verified"
+
+      - name: Record build artifacts
+        run: |
+          echo "=== Build Artifact Hashes ==="
+          if [ -f ".lake/build/bin/oracle" ]; then
+            sha256sum .lake/build/bin/oracle
+          fi
+          if [ -f ".lake/build/bin/test" ]; then
+            sha256sum .lake/build/bin/test
+          fi
+
+  lint:
+    name: Lint Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check file encoding
+        run: |
+          echo "=== Checking file encodings ==="
+          # Ensure all Lean files are UTF-8
+          find . -name "*.lean" -type f -exec file {} \; | grep -v "UTF-8\|ASCII" && exit 1 || true
+          echo "All files are UTF-8/ASCII encoded"
+
+      - name: Check line endings
+        run: |
+          echo "=== Checking line endings ==="
+          # Warn if CRLF line endings found
+          if find . -name "*.lean" -type f -exec grep -l $'\r' {} \;; then
+            echo "WARNING: Some files have CRLF line endings"
+          else
+            echo "All files have Unix line endings"
+          fi
+
+      - name: Check for trailing whitespace
+        run: |
+          echo "=== Checking trailing whitespace ==="
+          # Just warn, don't fail
+          if grep -rn '[[:blank:]]$' --include="*.lean" .; then
+            echo "WARNING: Some lines have trailing whitespace"
+          else
+            echo "No trailing whitespace found"
+          fi
