@@ -65,11 +65,19 @@ def evalOracleCmd (name : String) (args : Array String)
   let (exitCode, output) ← match name with
     | "digest" =>
       match argList with
-      | [path] =>
-        let (code, out) ← runDigest path .plain state.config.toCaps
-        pure (code, out)
+      | [arg] =>
+        -- Check if argument is JSON content (starts with {) or a file path
+        let trimmed := arg.trim
+        if trimmed.startsWith "{" then
+          -- Argument is inline JSON content (from variable expansion)
+          let (code, out) ← runDigestFromContent trimmed .plain state.config.toCaps
+          pure (code, out)
+        else
+          -- Argument is a file path
+          let (code, out) ← runDigest arg .plain state.config.toCaps
+          pure (code, out)
       | _ =>
-        pure (.invalid, "Usage: digest <state.json>\n")
+        pure (.invalid, "Usage: digest <state.json> or digest $var\n")
 
     | "verify" =>
       match argList with

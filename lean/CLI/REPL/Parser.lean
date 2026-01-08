@@ -76,8 +76,11 @@ partial def collectArgs (p : Parser) (acc : Array String) : Parser × Array Stri
   match p.current with
   | some tok =>
     match tok.kind with
-    | .word | .string | .rawString | .variable =>
+    | .word | .string | .rawString =>
       collectArgs p.advance (acc.push tok.text)
+    | .variable =>
+      -- Prepend $ so expandVariables can recognize variable references
+      collectArgs p.advance (acc.push s!"${tok.text}")
     | .lbrace | .lbracket =>
       -- Start of JSON, collect everything
       collectJsonArg p acc

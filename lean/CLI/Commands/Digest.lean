@@ -141,6 +141,67 @@ where
       Doc.status icons true "Computed successfully"
     ]
 
+/-- Run digest from raw JSON content (for REPL variable support).
+
+Returns (ExitCode, output string). -/
+def runDigestFromContent (content : String) (format : OutputFormat := .pretty)
+    (caps : Caps := Caps.plain) : IO (ExitCode × String) := do
+  let bytes := content.toUTF8
+
+  -- Parse JSON and extract state
+  let input ← match parseDigestInputBytes bytes with
+    | .ok i => pure i
+    | .error e =>
+      let report := ErrorReport.fromCode e
+      return (exitCodeForError e, formatErrorContent format report.codeString report.message)
+
+  -- Compute digest
+  let cfg := Oracle.init
+  let digest ← match Oracle.computeStateDigest cfg input.programHash input.state with
+    | .ok d => pure d
+    | .error e =>
+      let report := ErrorReport.fromCode e
+      return (exitCodeForError e, formatErrorContent format report.codeString report.message)
+
+  -- Format output
+  let output := formatSuccessContent format input.programHash digest caps
+  return (.success, output)
+
+where
+  /-- Format error output based on format. -/
+  formatErrorContent (format : OutputFormat) (code : String) (message : String) : String :=
+    match format with
+    | .json | .ndjson =>
+      s!"\{\"status\": \"INVALID\", \"error\": \"{code}\", \"message\": \"{message}\"}\n"
+    | .pretty | .plain =>
+      s!"Error: {code}\n  {message}\n"
+
+  /-- Format success output based on format. -/
+  formatSuccessContent (format : OutputFormat) (programHash : Bytes32) (digest : Fr)
+      (caps : Caps) : String :=
+    let digestStr := frToDecimal digest
+    match format with
+    | .json | .ndjson =>
+      s!"\{\"digest\": \"{digestStr}\"}\n"
+    | .pretty | .plain =>
+      let hashHex := bytes32ToHex programHash
+      let doc := buildDigestDocContent hashHex digestStr caps
+      renderPlain doc
+
+  /-- Build Doc for digest output. -/
+  buildDigestDocContent (programHash : String) (digest : String) (caps : Caps) : Doc :=
+    let icons := selectIcons caps
+    Doc.vcat [
+      Doc.headerBar "Jolt Oracle" (some "digest"),
+      Doc.line,
+      Doc.keyValue [
+        Doc.kvStr "Program Hash" (truncateHex programHash 40),
+        Doc.kv "Digest" (Doc.crypto digest)
+      ],
+      Doc.line,
+      Doc.status icons true "Computed successfully"
+    ]
+
 /-- Main entry point for digest command. -/
 def digestMain (args : List String) : IO UInt32 := do
   match args with
