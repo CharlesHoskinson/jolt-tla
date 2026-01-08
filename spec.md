@@ -36,7 +36,7 @@ The system takes a batch of settlement intents, executes them in a deterministic
 
 ### Current status
 
-**Pending parameter finalization.** Of 17 required registry keys, 15 await final values (see §3.4). The architecture is complete—security model defined, algorithms specified. What remains is instantiation: finalizing Poseidon parameters, selecting toolchain versions, setting resource caps, and passing the two-implementation conformance gate.
+**Pending parameter finalization.** Of 17 required registry keys, 14 await final values (see §3.4). The architecture is complete—security model defined, algorithms specified. What remains is instantiation: finalizing Poseidon parameters, selecting toolchain versions, setting resource caps, and passing the two-implementation conformance gate.
 
 ### What's outside scope
 
@@ -67,7 +67,7 @@ Different readers need different paths through this document:
 | Total words | ~40,000 |
 | Original normative spec | ~4,500 words |
 | Expansion ratio | ~8.9x |
-| Registry keys pending final values | 15 of 17 |
+| Registry keys pending final values | 14 of 17 |
 | Required independent implementations | 2 |
 | Public inputs (Fr elements) | 11 |
 
@@ -652,17 +652,64 @@ This appendix is **NOT deployable** until every required tag below is pinned to 
 **Tag count summary:**
 - **Registry keys (inside `registry.json`):** 17 required
 - **External handles (published alongside):** 3 required (registry hash, VK hash, conformance hash)
-- **Currently TBD:** 15 registry keys (all except `JOLT_RISCV_PROFILE_V1` and `JOLT_BATCH_COMMITMENT_V1`)
+- **Currently TBD:** 14 registry keys
+- **Finalized:** `JOLT_RISCV_PROFILE_V1`, `JOLT_BATCH_COMMITMENT_V1`, `JOLT_POSEIDON_FR_V1` (§3.4.1)
 
 #### Cryptographic Core
 
 | Tag | Draft value | Purpose |
 |-----|-------------|---------|
-| `JOLT_POSEIDON_FR_V1` | `TBD` | Poseidon permutation parameters (width, rounds, MDS matrix, round constants) |
+| `JOLT_POSEIDON_FR_V1` | See §3.4.1 | Poseidon permutation parameters (width, rounds, MDS matrix, round constants) |
 | `JOLT_PCS_V1` | `TBD` | Polynomial commitment scheme used by Jolt |
 | `JOLT_TRANSCRIPT_SCHEDULE_V1` | `TBD` | Fiat-Shamir transcript structure |
 
 These three tags control the cryptographic foundation. Change any, and the entire proof system produces incompatible outputs.
+
+#### 3.4.1 `JOLT_POSEIDON_FR_V1` (normative)
+
+The Poseidon permutation parameters for the BLS12-381 scalar field.
+
+**Sponge configuration:** State width t = 3 elements, rate r = 2 elements, capacity c = 1 element. The sponge construction uses t = r + c = 3 field elements per permutation.
+
+**Parameters:**
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| `variant` | `"Poseidon"` | Poseidon (not Poseidon2) |
+| `sbox_exponent` | `5` | Quintic S-box (α = 5) |
+| `t` | `3` | State width |
+| `r` | `2` | Rate |
+| `c` | `1` | Capacity |
+| `full_rounds` | `8` | Full rounds (4 initial + 4 final) |
+| `partial_rounds` | `60` | Partial rounds |
+| `field` | `"BLS12-381/Fr"` | Scalar field of BLS12-381 |
+| `security_bits` | `128` | Target security level |
+
+**S-box validity:** The quintic S-box requires `gcd(5, r-1) = 1`. For BLS12-381 scalar field, `r mod 5 = 3 ≠ 1`, confirming `5 ∤ (r-1)`. ✓
+
+**Source:** MDS matrix and round constants are taken verbatim from `midnight-circuits` v6.0.0 (`midnight_circuits::hash::poseidon::constants`).
+
+**Constant encoding (normative).** Every field element in `mds_matrix` and `round_constants` is stored as `FrToBytes32LE(f)` rendered as canonical textual `bytes32` (lowercase hex, no `0x` prefix, 64 characters).
+
+**MDS Matrix (3×3):**
+
+The MDS matrix `M` is a 3×3 maximum distance separable matrix over Fr. Elements are indexed as `M[row][col]`:
+
+```
+M[0][0] = ce1ab50741de1861779eba534074d58aa6d8e21012246d5dfd22b981c314811b
+M[0][1] = 63d7c0fc137271e3b4094cecca0c99751733f59c89215d0ed22ecbc44c2ef33d
+M[0][2] = c1ede1a0ae34cd3e0b08911560337f00b48e54bf798725beda64667adfc4053f
+M[1][0] = 74b3a831cd01f5d7b1e70f954b3174ca06ae3f6dd74a2a434ed1853907214d40
+M[1][1] = f14956950316faf72f42797631b2e9734b4d529e0e62bc81bdc6644270c82c0b
+M[1][2] = 1f1a7f638cfca8e2b448438319b50b6d495d0341c688935afa5950a54d66df0f
+M[2][0] = 4091c4907ec55df90a735ab601ad9731035d5cf4474ae2434321a6cdbe3d1d5e
+M[2][1] = 8aa75a2f00b9c77df35489ae5f6dcb4412c6a57ee79618939daf53fc9c2fd76b
+M[2][2] = dbe09df98eb84fbbd9468ed59cbdff1e83ef4b05a980f8ca7ba05f3aaac59749
+```
+
+**Round Constants:**
+
+Round constants `RC[round][element]` for `round ∈ [0, 67]` and `element ∈ [0, 2]` (68 rounds × 3 elements = 204 field elements total). Full constant table in Appendix A.
 
 #### Guest VM Configuration
 
@@ -799,7 +846,7 @@ A release is only valid if the operator publishes:
 
 And the registry contains concrete values (i.e., no `"TBD"` sentinel anywhere within required tag values) for **all** non-external required tags listed in §3.4.
 
-Implementation note: Three required tags have structured JSON values (objects): `JOLT_POSEIDON_FR_V1`, `JOLT_GUEST_MEMMAP_V1`, and `JOLT_CONTINUATIONS_V1`. "No TBD" applies recursively to every nested field and array element within those objects (see §3.5, condition #4).
+Implementation note: Three required tags have structured JSON values (objects): `JOLT_GUEST_MEMMAP_V1`, `JOLT_CONTINUATIONS_V1`, and `JOLT_POSEIDON_FR_V1`. The "no unspecified value" rule applies recursively to every nested field and array element within those objects (see §3.5, condition #4).
 
 ### 3.8 config_tags projection (normative)
 
@@ -2284,7 +2331,7 @@ Let Poseidon parameters be fixed by `JOLT_POSEIDON_FR_V1` with state width `t`, 
 - Any domain/parameterization flags required by the referenced Poseidon specification
 - `security_bits`: the target security level in bits (e.g., 128), used to validate that capacity and rounds are sufficient
 
-Implementations MUST NOT substitute alternative Poseidon parameter sets, even if claimed "equivalent." If any required parameter of `JOLT_POSEIDON_FR_V1` is unspecified (TBD), this transcript specification is **non-final** and MUST NOT be used in any consensus-critical deployment.
+Implementations MUST NOT substitute alternative Poseidon parameter sets, even if claimed "equivalent." All parameters of `JOLT_POSEIDON_FR_V1` are specified in §3.4.1; this transcript specification is final and ready for consensus-critical deployment.
 
 **State:**
 - `state[0..t-1]`: array of Fr elements, initialized to zeros
@@ -2541,7 +2588,7 @@ Note: `batch_commitment_bytes32` uses **SHA-256 Merkle** per §5.7, not Poseidon
 
 ### 8.10 Forward references
 
-- **Poseidon parameters (t, r, c, round constants)** → Section 3 (JOLT_POSEIDON_FR_V1, currently TBD)
+- **Poseidon parameters (t, r, c, round constants)** → Section 3.4.1 (JOLT_POSEIDON_FR_V1)
 - **Transcript schedule for Jolt** → Section 3 (JOLT_TRANSCRIPT_SCHEDULE_V1, currently TBD)
 - **checkpoints_digest using PoseidonHashV1** → 5.8
 - **StateDigest computation** → Section 11
@@ -6261,9 +6308,9 @@ The 26 TLA+ invariants encode a precise security contract: any implementation th
 
 **Current Status**
 
-The specification is structurally complete. Fifteen of seventeen registry keys remain TBD. The formal model passes TLC verification with 9 states explored and all 26 individual invariants (plus 6 composites) satisfied. Production deployment requires:
+The specification is structurally complete. Fourteen of seventeen registry keys remain TBD. The formal model passes TLC verification with 9 states explored and all 26 individual invariants (plus 6 composites) satisfied. Production deployment requires:
 
-- Finalizing the 15 TBD registry values (Section 3.6)
+- Finalizing the 14 TBD registry values (Section 3.6)
 - Passing the conformance bundle (Section 14) with two independent implementations
 - Completing security audit of cryptographic parameter choices
 
@@ -6283,6 +6330,93 @@ Remember the opening scenario: 10,000 trades to settle, rational privacy to pres
 The mathematics is now machine-checkable. The security properties are now invariants. The protocol is now specifiable.
 
 What remains is implementation.
+
+---
+
+## Appendix A: `JOLT_POSEIDON_FR_V1` Round Constants
+
+This appendix contains the complete round constants for the Poseidon permutation specified in §3.4.1.
+
+**Source:** `midnight-circuits` v6.0.0, `midnight_circuits::hash::poseidon::constants`
+
+**Format:** Each value is `FrToBytes32LE(f)` rendered as canonical textual `bytes32` (64 lowercase hex characters).
+
+### A.1 Round Constants Table
+
+```
+Round  | Element 0                                                          | Element 1                                                          | Element 2
+-------|--------------------------------------------------------------------|--------------------------------------------------------------------|--------------------------------------------------------------------
+    0  | 578254652f2e8a11d0f5355849b19e42da748b86309078e6bd802e706c17590a | bdcf51fe022a3a93237d1224bfdb04d3f24bab5b5a8a8ecd107d9db909ee041f | 7354dc0af58052af200ca10a782e1a9f4c1a309e638d1829f5419e6aee0a3b05
+    1  | 9c3fbf7988d4f7ae511939e296baea6781fb90f1c7a056e4567f0d8713c67f60 | fbf2a7da05cba4b56e48deb584ec97a65945e3a03999f91381e191f0474d9365 | f9636b19d1bc53a8d5ca5a8d7213ec4f8947d1eea4f9fa8ea921c620fa96e818
+    2  | 50d94fa830be36e3d2964781267c7ae4c948312667edc41700adc3f3fc9afa69 | 2d26a941b6cf588ed7cb72f9bcd347127b40fb6b456e975cb9397928b8d37671 | 019ac3dd7369e6634a280befd702f2418b7fba373b5ec0ff99febe5e1c046d03
+    3  | 6f810adf2e042d73a2e5fb9f321657502109c2b4ae153b013374de31cc42055d | 128c8a53f209f9425fb2de7fb323faf200be13895d6604b83181c6cc26fb6526 | a78b9a6f3c3d089daf954dbb313c7769cb0e805c6e04bbe789585c685a70e33c
+    4  | 3d9644d563791eaf6528c068fdb7fdd4e31674d7e22591fa8ea84a0986ecc64e | 35fbd7c351dbfdc2200406849edaaba2f9edeb1deeadcedc11f0c6ae2ab3c004 | 55fe6a7d99b4784ff821ff43b0204d02e1559c764105226a1e15fa29925c2716
+    5  | 45878ba3cc2703c1b837b44031a9f7b4008b0f7df5ba94afef102f51e5130815 | c24363efdb9ffdfe70f55ddd04339236ec60e39e56df6343e2b19db24761065f | d560667180207a8f5d9fefe05d01fbc4205b5a721892cf3fba45e21ca3e35a11
+    6  | 4e3914a4224be1e5693df9f2dbb27b93e3795dfdc0508903f3459ac265de7632 | bf48b5d25aadf8922db642cc41e03e13a6cc5568af77f4350bebeb0c8049504c | 782bae1f49db1cb25730c9413d8b0f2dba4b7ac6aec89641f3ea729c541b2e25
+    7  | 7c2ad27983c7adeda0c0e14ae7873fbed6358c85605569347ffebccf270f0a5a | 9911e0d486ed51b5d86403b3dc98c10af2eb2ae1894633fd0bbdff39fe41ef5a | b94dda1606eb8a536a56a4873369c6bd4fce7f9e835dcdd480967a4d57eef72f
+    8  | 447cfb60a5d55242feb5571eb6fbba05ce8269422edfde3f91c7a9bcbb309559 | 86306bbc18dd3604866845ee0cf28da8d456a221bca8b90b41073ec699fd4a59 | 2cbf221142bebc8cb41eb9ee66b2c9c76ab5fc7f32cf6aabdb1d6a05bcc21b56
+    9  | c0e4039be35350187ba988852890f89510319f5ba17173694a0fe3fe29f6b044 | 44a7003fceec139b82e4f642d91308e915486297d5e5781bc800762a36bc6666 | 8972b76573eb20204a8ce2bff535fad36a1cd21202b0eb2d4980add794154939
+   10  | 2c58a6fb593a3856a8c269321373ab38fa3a26d0eac0ebab04769084f4ba7a68 | ce16157b1e6b4e6acc256a6160b5733786b8ffd0244f297a370d6dd6a020a931 | 284a88a511a40331dffeed3c5bde44f8b4677b5cfcf528c611ddaa731af8d043
+   11  | 19b8360144d99d2857e202f5537a455c584d87eda4a57118facfa6ab2bc8b33e | 097e57500b6d7c79ae53a17b255a5ed7c8696fb2b666ed9b74d8bad0de6e1933 | 1198543a7a9bd2ca06c8c6e30a3c187a0ee585b71a73c07bd38d307daf6ad243
+   12  | 87a3ed3753f1f6c233439fc3554ce5258c0a5f4dd3443d052946934a12d4ca53 | 56f375d54c1f3e79c5f825e3015e88ccb42b516ff2e407f70a02c177b7d6af3e | 30099fab4090beb7533435ece8899366b0e3b8e7c2af5b190e6a30c42e202053
+   13  | b0260b0d8ead88084d93da2619e384a9d6289da94a4e3db0963b0f80df917b58 | 828ff9f3d188db1b000b65e169aa53255ef1b616a6bb6703475887b77eccfc2b | 4a9d81433fbb2de15e7f8ed7b7e93cdb209cabd575b6176dcf7448c5e0f22214
+   14  | 4c9cb4b00e2a15f7cb03e6c700fc8371dd424025cf9f3d062f1a3aeaa284fd28 | 574b1144d52581233c13d2f913cf1a39fe5d09ff1ff4da13eb111cb829cdbf28 | 3fffabf770df54ccfd030509b52688c96077a68fab8b0335eab58eedc0c48655
+   15  | 26ab8ba6158449faede973bf235d428743f3e8652c5b15731662ec037f360912 | 33b707b6640979dff1be7673418a3e7b5e3bb27efd00ee7dd3f615322d6b3522 | 726622fd40b0ef3b7f4a68f2c1c0c8096a4adad3358180c45f8c4debb43c166c
+   16  | 3ac3489e9ca059675d4f1695f2816c6aa495b4784c5e3ebdf748fd254ec0c34d | fbe79addf9faa0adf2babce94511653688ba69f6066e19a71135eb29f49d0d59 | 8a09cadbc294edb85742c2c62affd1131d81d6865405477b28dfa3106893f22f
+   17  | 0cfa916988be78d1323e7e79602fb540e756ade2b495bcc4b1e4d971a749525f | 27fb024ec37cbae154bbe9181b8d982d0edab37d16e3c40eeebb6ecf078ef767 | 62a7b71bfbe9b4a0fed983551cbef961002b5ed9726ba163aac68897bda39e2b
+   18  | d259eef0eb73434afe672a3407048fbdbb33d4015e5f41f0cc21edcb17af1b0a | 7779deb0ef62497814ee040bc9d356f874305e7a6ba220e61d5630eba2cebf1c | 5f04518a4bd86fc89fcec125a290fce706cecd4868f2fe4a800658d251cbc939
+   19  | e9d9a48872cbbfc055ac84a2dcda652143f07e2e2c7c9a89e277c1e4345e4d42 | 2c083ca0773e92d7ba50d3af9f6bd93d294411e01876bad21837285fc6e88733 | 75e7c6262afde127e6d8bfa3b720bf50c4d40d351d12b203805f747e24f12665
+   20  | d39dd681429a215fbccbf5fad060d118bb9ee9c8effb7b4be52671df4d39c722 | a154e72afe81fd4ccb1d386633b703149210aecc0a8bb7697bb394e99bacf62e | 77d975314c3c690225ed3b3e2c22d87f54114eb87f7e248444ddf3d2c7a5e64b
+   21  | d2098528695e1829fa88bbe670e0e3e79c6053e125c35b4bdcd57e8031ca3a27 | 37017a56924622ad2ee479ab30ccedf0f91b3a7c05f5b623b3aea1e3ca21b32d | cf885aa9b11f9970b984110987363630ab30e048a4013335522ec1f424449745
+   22  | c830be2e9d39f164b361dc3a685ad7283997b34e8e8ce5bf70b3c094308fbc4d | 70c1b52ecc12bac45df92bfb77a05d9077b526190e41a7910f3c3fe1f0101c1b | 01c072f19bab0c166b58acda6d05a1735e76ad0ed6e59b364e1ed77e99a6bb1a
+   23  | 6b1406a6377eec7cf62d70b07363405e0a144678e2664f78edd644e0fc9ffa3f | 3c1fde7ccda264fbbba6e873981c68200fb85419f511baf2e3e233d3fb1e2d17 | 7e6ed293b8099cbd6657300f519c248e0b88afbaed1d4931801ba98215494425
+   24  | 80ba721624aa34810f3d60ceb1549ef35c1a29e75c0aa052b9e91d11d2a18e59 | e5587d03ef3a2fb39e76ed38b94c4bab5fd46b95a9318fc1c8e2f6a86415d030 | f93ec9986fa06c0748f3d24cce266dc1f32abb44e8c59c4fd5399ffa1fdee058
+   25  | ab8b057f7ffe88a4f86c1d350c57d849fff9fca53e6764e258121e3e0492b845 | 2145790b86de90ac2c161e215a2dd220731b45ccfed3f5af3ede0e80a4d5802b | 17dab7df6693355874efe9264f5ef30564b4eb461c441d410709192b20069d41
+   26  | 422dd8d2624ab53a169e949b0dcf3b37176d27b7118fe124e209d43e3455073d | 841bed13d48fced5456765ee3379bbc658959d1bbadbc8aadca528548f0dcb53 | 22d182c74ac989f1b8e14936d61776b4dafcc37867362ecd60cdd335e9c5070b
+   27  | 38e7244639f2a898b83dd0f556ab7af9c4316dddb1976604aa2ada75fa975e2e | faca54031486f0378127e7b10e2907abc1f4dc690e621c5128e0d94cf98f040a | 7c14b76c30376b55fc37358e3f69968e8b0634c732ce82520b57d13268434317
+   28  | a9cb071795635f290b494091f2248b68bbe889b8cfb8043c5be7866b48eaf328 | ac2e6d7d2a1e43b8d7accdf4e61be6911ce81db801849213f9cd9f9db6bf0d15 | 0244ea5c29a13f2435f72bbdeae0b52d7413227b42ded5a075a30d453934ca29
+   29  | cb4d667a93085621da50b90cdecdb686f27bb2d710c2c8fbcb5fa6762bb6a148 | ed389f3e22ce62a50a696aec06e20a4d7b027c696e269cd6ec4143f26aeb1802 | bcd8f334db1d09e4ed00ce2bf8a9245147ca8358d51578509334e1f18eb3a309
+   30  | 1b88630ff2b76c6d8785842ab3d9ba5df8e7cfda859c652d826a89d1a2864017 | cff35ff8a63b351a357e1a2485f2321d6faa6e19b8ef1f3e65f7fbeeb611fd23 | 3b33a3051483c94d2fccc103771b5e9e59901ad6cc83430099194002ba182849
+   31  | 25e735e0a826bbb27f091b537232ea68f5ab4318b08518a345a1925490b87301 | 2ce18898d0b8de40e027df7947292fdad4a4f0eedb9b5caf27c2bbf34270d543 | 79d97e83df6f13a8d2d01c61ffb3a8851014eb66c1fababa83ec2eb756e9ef17
+   32  | 9acf42a04af0d883d82f09b510556ef84e55c127c2457b31ae01d42a86996902 | 5bb869bb348de488ef5556c11a1d8091fbe3aa9a23dd051e3404188451107807 | c5ab961bd87ad113ee82e0d2d7ffcb0ee900b0f65b3b48faf3179e4296184669
+   33  | 4add4183b848ec4f6dbd160f28897d195a363b03ee68f1b014a3ba0f69eb1803 | 09d53304b7f47a392cd3f278d114c00a566db725fa7780d65e750bf7fb6eee23 | f4b01e09f5b1d13954e005665a4542842e2b4a5d589575e70df47afcc1a22960
+   34  | edb5bac64ef7a5b5e0d71c024493204e4d250acaaf7394e71d91d8a5c2fc8565 | 1a245c567a1f68b14a9e1121c776db06c72db7f8c176e98e358fd9afeda9c36e | bd6f4b3a6f7dcba8ac13b00183fc747c3dbcdb0bc5a9ca6deba2872802929c2c
+   35  | 7e1bdbd6bf86b7e48bce125a7790478d835f0ea129005e8e4fd30274f0db7f08 | 00749e1be0888d3a5ed847c53aac52615eb402b1070eaf5b1778a8dcfd33a805 | 15d3acf73463dc52ef2e0382bafcf59fc6ffc09f3b3f022df5513ebdd75ce16d
+   36  | 91eead66d1db89d319f3702bb1b3126c89b124b3a6be60030b10aae778394e2e | a56eddec0e621f606affd82785b535432517d0704bf702f22bb8c76ca16ad459 | 86312e8ff53f0ce942ccd752950b2b35dcb5fe8714aed55dada39537b84fb047
+   37  | 2e0629a70ef5b0519e336e80d97485e623ab8bf45a439fa82fd3a240ab9aeb72 | 37c23f560f2997bece4a59a7a866f212464db416121af0a6064f501b58bab552 | 6009bce0170a870cde13852c83aec26e6ea3f60bac38f006f38d90f7a4ff9220
+   38  | 4d4dde4cb4f24442ab0774d885d96beb1d3e2d05c5ca5a51218e1e74b03ffe29 | 36d21a7d78ed45368fc3b5fd547bd65faccc15314d659078a6f49e28a489d847 | 5c5965eb1cd039ebedf52d2fdb844b00b6a5b05014cefea027c1eb2c94e4e540
+   39  | 89b3f4f63acf3f7cd880fbc1c4d009233e96eab1502c718659c6c5aa41580356 | 31d10678895124440b0e1c3b6d4f1f923e2bf924b302f607e912a775496f1e26 | 564ada2eda6e6fe41eac3180487d17b7da49f1dff1639ca4f4beebcf1071bd18
+   40  | 854a601ded8ef6486b05d224d381e4e0a220a0bb031c51e64820ee7b40ac066c | 2f0956fd163b20c9afab69dc2a01e4ceb5cfb0053bfc396b09bc666ea884ec4e | e7a162f3103de9ae61c12ec42b5e8286732d38c782805ba626ed1a023399e670
+   41  | d4501365cb6f7e0830b7f658735203cb36ea1b71e2a98fc5ea45449cdf6f6366 | 2cbc09ab7497ba5d533e726db7db3c3e00aece29a17c55141dd0f6497a348545 | fdb9bc0ad7b3d125267e1be47adfaedd0145325993a6580eb6a13e6426cf5818
+   42  | fc8abd361199ccada46968228fc1ea470e53fbdcae0881cd6d1f83c91d458f67 | 52d589601abfceac976f3fdc6605a885915828c56e64676c5d6dc0c6cdc6770e | b16cfb80a88473b3ccac7dacf88aefac7a2245fc1629d3a2b0c8bc2bc7336f13
+   43  | 0c932520723c4578ac097dfd0f6f78a1639e3a0e559a3d50272ecc1abffaca02 | 5802cc1994d68df2c5e3c01a67c69b702106d915aa1c481cdea5019bee05c513 | 540c646c91cc1d05a4bac94d8329157d208b829f3c63f9d979dfb577c8e53b63
+   44  | c3862c132b937f602da3f22ceb970e28f7b33247683b89870af1548e36a51029 | 5965e9a022c34b7f40974e9ded8ddd4c2bd0b31628ddb3e42e24641e2fadb65c | 0a0b03080f2abbbb2440d6465908d9eb4fe5ed99ef9559dd36776808c73af03e
+   45  | 10912c934bb3d90e666f57e7c8c775a1dc2ce4897873e77c95ba1584f2f6c232 | 54fc1b2d3b9717080f92ffdca964167175e8b8fedaad8d1a22dfcfa76599182c | bb8c5c7f9f5d3ecb7c3a5c9d0a10ee18a388e75a73bcc127c80ebc76709e5461
+   46  | 3cd7de1271288d8ca919079478db430ac3752cecf3d2819f48b71fdc96ded425 | 873a50de3211230801b70042515b57648d895aca5fbf222d6d8ff99814190b66 | eebd8c29cf652590b2b6676aced1e845e357a868c5c4c31d38ce13adb527c51c
+   47  | 1b1cda7af7d7f38d126c2af4d34aa304d691d6799e2b1c1e6b2de9d2c8f31f32 | 1f7830d395f81dd96fd732aa315c3e314e593c3634ac57e3c1f2f93442008f1d | b7fcdcc3cfbe8535ee67c996280ac0cfff38d2247d28460476784cfdc8d64445
+   48  | 39e3befdc14b2057e9903725808b6de44f4b8faf5f0eb0bcb28f24530a8da020 | 8f6dd794cd05e3e3c1bd13ed22476c6621b5d09a6353045e3c96257315c2b536 | 476a37495b546dbbd1fb28850fb6f34f3a836002e9fda772f1dc50462b2fb143
+   49  | 06ed45eb48340c327a84d3259d8342262b203783f8d73c3f1e59a4974c8c9501 | 7e3e4b4428b9da6edb624104f13a96325c5b77177a25d3cb0b0bb53b3964c453 | 414838f72f55381708e98ba06aec656bd885df39972b1d5256a3748f118c3f48
+   50  | c67e7b39eb35f1404a031e509d3974fe825230a4bd399ea9ff8ad81ba8c66336 | ab5cd3c81619f766946ac23c4b181e5ec9534e41a142bb9aba963d5a69ba9f1b | fb88652ed0b905d9efc5d83ee50ce550b992c6864f2fa324fab310007ee2b36b
+   51  | 7881b5675b0c3a31a04abf0fd035a2001536bd6fda46e20c324999715c1e8153 | 66839654e778ab4d1ae95e973e51d216c4d5205385d041805f771700b8553359 | 0859df386c496efaa44fa6333b198652806b1a8914c5f23317efe13ab60a210b
+   52  | a1273ed010a88841a40230907417f1078b3574827b5ef803765949770e38f126 | ac755749b4a6caf44da9a8b2bdb30fc73bfcfa724fc6ed77326323139cd85103 | ef5cb371a9ea04af5c6cab2306d7379d1e678064069602b8703f824a4179a739
+   53  | d51d0ef62785b9bae4f2210c7951783530e352094ac13f7db7050b1a94e6f833 | dcf4382ddced973f5f4de48fb23c5e957a375778f870a5f292a872db72d23639 | c9e659324f15338c5050abcb6563bc23593866782a2428c4370c9dd1d9838425
+   54  | eefc7690059a4795de99fa8b0349078c4de6ee8f8036e1458589debd0de10673 | b17fd04ee7390684d1c7efd919514b7cc5fbea2f398b8bd4ce037a5784320a3a | 6af701cd5ab0162bedb55d926d079892ebe26b977d6b79ddd3021191ca3d884d
+   55  | 87db167054c7d111ed1da7e4a771702cf5f24c47793b6e916a7201042b98fb27 | e6c25ec676a2ea24bafb375e38e88afa906b4da0ed68ed89fdf685ab204bbb72 | f2906756fb97054dbcee6cb7ea181ac8c3d172a29df5dd237aacffcb81bf7623
+   56  | d5bcef6738abcf4e7b5f63e8928e3c1ffc57b8fadfb4149698711fa1ca7dfb09 | f4d32dc7af09d33d5b7e013ff7bf10e419e9f19c99efba13058c844468a7d737 | 61ea7787df2643a8a00cc17a1f920fcfb163c80c90aa8ab07cdb08a672ac286c
+   57  | bf9fb576ec144d4634d512858afb400d07937aab3bac3e01e2ae7afb7208c36a | 7161795903522d20d4b0afcbe751faa7c266a93b3c6f7fa97170f2d143e38815 | 09ab3ccd79f33a5522547531b0cee8746177d5bb7229252f37879ab40a28dc11
+   58  | ba47b338058fb4dc45788a580e0083de13c76188e53c4b9bfd3868978dc8fa41 | a1b375ba4d78558be775249d61a7fb44dadef10620360eafa6c86c82ab70b210 | 57e60e398e926afa94e07d4f6cf614403349a041d004b5d9bcb0c599d4037d35
+   59  | 53a40f44adbcd1d468580ffff822fcc4b42abafd12b9e5d8a825e0cd5fbb562b | 84d6bfef12324b9b368fc4244ac8e508daef19bbf075d355de896b500a06b437 | 34e8a34abd9b02f3ffcce5d204509243c08ac4ef0f8a34f645d55ac88a70166b
+   60  | 2edd634ddf05e71ea6e01c98f63e16209cb18a8e65228b4988d1323e36070e04 | ca1257600dc6dc09423b9bb29f4d6d6dd34699bd90e053a7602b67c51908f701 | 27fa1aac872c93da48a6b12e41c27ed4c7edd4f16cc9278caedfb519e001f449
+   61  | c8687565a6550568aa5d7bd0e483ff0ecaa525fe7fb81cec6a834cbb0d35da6c | b12e8ba3269f500e6e54c87cfc344ce9e18cb12cc1a9eb8143774287886c9b5e | c286b90d2c7e75f681fc4c971ab058c99c0b078e2fb77419d7559cc6b6b6e464
+   62  | 11720244d5ad84309be20cd7573398253cfb34c2d7cac45b888449910bbb705e | 9204a512a849e767f722baab0260da0f5417477b70b3c1e204812aa242a1d504 | 0b9d34d1c4b350134e6c0d2dbca1bbecce8d8097ad53af9034ca1a5d0a2c2d43
+   63  | db5aa9856b2bb54211f24e206f375ae62b793830105dc10dc0eae21c89bed447 | df158b742b9fe4afad77f9fdbd2587a08daedf331cffb1d7f736c965f9df586a | 3390de9b6b90a2cda8041ea16a0116ead08fdbc51864959211aba6e3923da60c
+   64  | d272dadf8f84b9820987e7ed097829f67d952b0a35b2d6d8dab4e00512776038 | 819246864d7b43c4d87df9387b99f91264e58e38bfceb4c27fb73178a5dc1d3b | a626251f59a001f689fc98f12b2920b12c1a8b56232c9814a4cf4c79bc0f9328
+   65  | c1fb3b2b12ecab2ada7a40d78a7b701dc81cbcae4bc7355d31c7ad912d502505 | 870a703fe6090228e052a310ecf9c6c9e5cfe8553dfbbb043615b56173f0d538 | 377852b08cc81d5ac1198782d7e2b542507fb0baf1af265a1a66d9d240680929
+   66  | e299435e88f8f96f34cda4ec3e66ed327168b380f69c5ef52731f6ea6a308852 | 90150b62c82abd84052db9791a8c63702eecaaf7c26466a1b355c3abdeb9765b | d0212a1296e66d57e467987d43164b4ee47247bd941192d5195281c06ec36557
+   67  | 922cd22e0f1aabce3deb9acbe2ae548ee2bb52ab5e7cee6fb7617316f427bd63 | 63c45c1e683f113ce9cb39af53c7786c5c8adc8d5ccb9f6c57387200a58e5e02 | a0b4c8323cabefb51c2cff5f1f83ffc1933510934be044347d86162861446a27
+```
+
+**Verification:** SHA-256 of the concatenated round constants (in order, as raw bytes) = `0d4c0ed8f86376ee2236b69bafa0e3d549bceadf8a3ee52bb882df6e39982e38`.
 
 ---
 

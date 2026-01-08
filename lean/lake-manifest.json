@@ -1,5 +1,15 @@
 {"version": "1.1.0",
  "packagesDir": ".lake/packages",
- "packages": [],
- "name": "«nearfall-kernel»",
+ "packages":
+ [{"url": "https://github.com/leanprover/lean4-cli",
+   "type": "git",
+   "subDir": null,
+   "scope": "",
+   "rev": "933fce7e893f65969714c60cdb4bd8376786044e",
+   "name": "Cli",
+   "manifestFile": "lake-manifest.json",
+   "inputRev": "v4.26.0",
+   "inherited": false,
+   "configFile": "lakefile.toml"}],
+ "name": "jolt_lean",
  "lakeDir": ".lake"}

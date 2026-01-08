@@ -4,7 +4,7 @@
 
 [![TLA+ CI](https://github.com/CharlesHoskinson/jolt-tla/actions/workflows/tlaplus.yml/badge.svg)](https://github.com/CharlesHoskinson/jolt-tla/actions/workflows/tlaplus.yml)
 [![Lean CI](https://github.com/CharlesHoskinson/jolt-tla/actions/workflows/lean.yml/badge.svg)](https://github.com/CharlesHoskinson/jolt-tla/actions/workflows/lean.yml)
-[![Version](https://img.shields.io/badge/version-0.2.0-blue)]()
+[![Version](https://img.shields.io/badge/version-0.3.0-blue)]()
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 ```
@@ -82,18 +82,92 @@ Every attack produces a detectable inconsistency. The spec defines this algorith
 
 ---
 
+## Why an Executable Spec Oracle?
+
+Two teams implement the same protocol from the same prose spec. They agree on intent. But one serializes JSON keys alphabetically, the other preserves insertion order. One tolerates an extra field, the other rejects it. Both choices feel reasonable. Both pass their own tests.
+
+Then their nodes meet on a live network. One accepts a block the other rejects. Consensus splits. Assets fork.
+
+The oracle is the impartial referee. Feed it the same bundle, get the same digest—or the same rejection. Any discrepancy surfaces immediately, before it becomes a chain split.
+
+**What makes it canonical?** The oracle enforces a unique, normalized representation. Hashes, signatures, and commitments have exactly one meaning and one byte-encoding. No wiggle room.
+
+**What makes it executable?** It ships as runnable code. Anyone can invoke it. The answer to "what does correct mean here?" is not a debate—it's a function call.
+
+```
+oracle digest state.json
+> 0x7a3f...c891
+
+oracle verify chain continuation.json
+> ✓ Chain valid: 5 chunks, digests link correctly
+```
+
+In distributed systems, ambiguity is not a nuisance. It is an attack surface and a fork mechanism. The oracle replaces interpretation with evaluation. When a transition is disputed, the oracle provides the single notion of truth: either invalid, or this exact result.
+
+**Where oracles earn their keep:**
+
+| Use Case | How |
+|----------|-----|
+| CI conformance gate | Generate golden vectors, check against them |
+| Developer toolchain | Validate blocks, proofs, state transitions locally |
+| Audit trail | Reproduce any historical computation |
+| Cross-team alignment | One truth, many implementations |
+
+The oracle is correctness-first and fail-closed. Malformed inputs get rejected, not "helpfully" normalized. Differences cannot be glossed over. They are forced into the open.
+
+**What the oracle is not:** A production node optimized for throughput. A network simulator. It focuses on the deterministic functional core—given pre-state and inputs, compute post-state (or reject). That boundary keeps it small, auditable, and stable. When the rules change, you update one ground truth, and the ecosystem gets a new target to align against.
+
+---
+
+## What's New in v0.3.0
+
+### Poseidon Parameters Finalized
+
+`JOLT_POSEIDON_FR_V1` is now fully specified (spec.md §3.4.1):
+
+| Parameter | Value |
+|-----------|-------|
+| State width (t) | 3 |
+| Rate (r) | 2 |
+| Capacity (c) | 1 |
+| Full rounds | 8 |
+| Partial rounds | 60 |
+| S-box | x⁵ |
+| Field | BLS12-381/Fr |
+
+MDS matrix and all 204 round constants are pinned. TBD count: 15 → 14.
+
+### Midnight Wrapper Compatibility
+
+`JOLT_WRAPPER_PROOF_SYSTEM_V1` adds Midnight-compatible proof wrapping:
+
+- **Curve**: BLS12-381
+- **PCS**: KZG with k=14 (domain size 16384)
+- **Wire format**: `proof[v5]`, `verifier-key[v6]`
+- **Public inputs**: 11 elements in specified order
+- **Nonce replay protection**: Built-in
+
+New TLA+ validation module: `WrapperValidationTests.tla` (15 test cases).
+
+### Oracle CLI
+
+Executable specification with interactive REPL. See [Oracle CLI](#oracle-cli-1) section below.
+
+---
+
 ## Verified Properties
 
 We don't just specify behavior—we specify what "secure" means, then prove it.
 
 ```
 ┌────────────────────────────────────────────────────────────────┐
-│                      29 VERIFIED INVARIANTS                    │
+│                      30 VERIFIED INVARIANTS                    │
 ├────────────────────────────────────────────────────────────────┤
 │                                                                │
-│  TYPE SAFETY (4)                                               │
+│  TYPE SAFETY (5)                                               │
 │  [x] Values well-formed according to types                     │
 │  [x] No undefined behavior from malformed inputs               │
+│  [x] Poseidon parameters valid per §3.4.1                      │
 │                                                                │
 │  CRYPTOGRAPHIC BINDING (10)                                    │
 │  [x] Program hash bound -- can't swap programs                 │
@@ -126,7 +200,7 @@ We don't just specify behavior—we specify what "secure" means, then prove it.
 | Layer | What It Is | Who It's For |
 |-------|-----------|--------------|
 | `JoltContinuations.tla` | Executable TLA+ model (~900 lines) | Auditors, verification engineers |
-| `lean/` | Machine-checked Lean 4 proofs (~4K lines) | Formal verification, production |
+| `lean/` | Machine-checked Lean 4 kernel + Oracle CLI (~8K lines) | Formal verification, production |
 | `spec.md` | Prose specification (~40K words) | Implementers, researchers |
 
 The TLA+ spec isn't documentation. It's a model the TLC checker executes, exploring all reachable states, verifying invariants hold in each. If there's a state sequence that breaks security, TLC finds it.
@@ -174,7 +248,7 @@ sha256sum tla2tools.jar
 # Parse
 java -cp tla2tools.jar tla2sany.SANY JoltContinuations.tla
 
-# Check all 29 invariants
+# Check all 30 invariants
 java -XX:+UseParallelGC -Xmx4g -jar tla2tools.jar \
   -config Jolt.cfg JoltContinuations.tla -workers auto
 ```
@@ -199,13 +273,14 @@ Every push runs TLA+ verification via GitHub Actions. See `.github/workflows/tla
 jolt-tla/
 ├── JoltContinuations.tla    # <- Start here
 ├── Jolt.cfg                 # TLC configuration
+├── WrapperValidation.cfg    # Wrapper tests config
 ├── spec.md                  # Full prose spec (17 sections)
 │
 ├── .github/workflows/       # CI pipelines
 │   ├── tlaplus.yml          # TLA+ verification
 │   └── lean.yml             # Lean 4 build
 │
-├── tla/                     # Modular sources
+├── tla/                     # Modular TLA+ sources
 │   ├── Types.tla            # Fr, U64, Bytes32
 │   ├── Encodings.tla        # Byte/field conversions
 │   ├── Hash.tla             # Hash abstraction
@@ -215,14 +290,28 @@ jolt-tla/
 │   ├── VMState.tla          # RISC-V state machine
 │   ├── Registry.tla         # Config management
 │   ├── Continuations.tla    # Chunk chaining
-│   ├── Wrapper.tla          # Proof wrapper
+│   ├── Wrapper.tla          # Proof wrapper (§5.2)
+│   ├── WrapperValidationTests.tla  # 15 validation tests
 │   ├── JoltSpec.tla         # Top-level
-│   ├── Invariants.tla       # All invariants
+│   ├── Invariants.tla       # All 30 invariants
 │   └── MC_Jolt.tla          # Model check harness
 │
-├── lean/                       # Lean 4 verification kernel
-│   ├── NearFall/               # Source modules
-│   ├── lakefile.toml           # Build config
+├── lean/                    # Lean 4 executable spec
+│   ├── Jolt/                # Core modules
+│   │   ├── Encoding/        # Bytes32, Fr2
+│   │   ├── Field/           # Fr arithmetic
+│   │   ├── JSON/            # JCS, Parser
+│   │   ├── Poseidon/        # Hash implementation
+│   │   ├── Registry/        # Config validation
+│   │   ├── State/           # VMState, Digest
+│   │   ├── Transcript/      # Fiat-Shamir sponge
+│   │   └── Wrapper/         # Public inputs
+│   ├── CLI/                 # Oracle CLI
+│   │   ├── Commands/        # digest, verify, etc.
+│   │   └── REPL/            # Interactive mode
+│   ├── NearFall/            # Proof modules
+│   ├── Jolt.lean            # Library root
+│   ├── lakefile.lean        # Build config
 │   └── README.md
 │
 ├── docs/
@@ -278,13 +367,55 @@ Tests check cases. Specifications check **all** cases. A test verifies skipping 
 
 ---
 
+## Oracle CLI
+
+The Jolt Oracle is an executable specification that computes canonical digests and verifies continuation chains.
+
+### Build
+
+```bash
+cd lean
+lake build
+```
+
+### Commands
+
+```bash
+# Health check
+lake exe oracle status
+
+# Compute state digest from JSON
+lake exe oracle digest state.json
+
+# Verify continuation chain
+lake exe oracle verify chain continuation.json
+
+# Generate test vectors
+lake exe oracle generate vectors --count 10
+
+# Interactive REPL
+lake exe oracle repl
+```
+
+### REPL Commands
+
+```
+jolt> help              # Show available commands
+jolt> load state.json   # Load a state file
+jolt> digest            # Compute digest of loaded state
+jolt> verify            # Verify current chain
+jolt> set field value   # Modify state fields
+jolt> show              # Display current state
+jolt> quit              # Exit REPL
+```
+
+---
+
 ## Status
 
-**Released for Comment** — v0.2.0
+**Released** — v0.3.0
 
-Feature-complete. All invariants pass. Open for review before finalizing.
-
-Feedback wanted on: ambiguities, missing attacks, modeling improvements, documentation gaps.
+Feature-complete with executable specification. All 30 invariants pass. Oracle CLI provides conformance testing.
 
 See [CHANGELOG.md](CHANGELOG.md).
 

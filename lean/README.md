@@ -2,6 +2,8 @@
 
 Formal verification kernel for Jolt zkVM continuation semantics.
 
+> **For Security Audits**: See [jolt-kernel](https://github.com/CharlesHoskinson/jolt-kernel) - the minimal 2-axiom audit target extracted from this codebase.
+
 ## Overview
 
 A TLA+ model checker explores states. It runs the spec, trying configurations, hunting for one that breaks an invariant. If it checks a million states and finds no violation, you gain confidence—but not certainty. The state space might have a trillion configurations. The bug hides in state one trillion and one.
@@ -101,10 +103,19 @@ lake build Tests
 | ATK | 8 | Attack prevention |
 | **Total** | **29** | |
 
+## Related Projects
+
+| Project | Purpose | Axioms |
+|---------|---------|--------|
+| **jolt-tla/lean** (this) | Full TLA+ invariant verification | 10 |
+| [jolt-kernel](https://github.com/CharlesHoskinson/jolt-kernel) | Minimal production audit target | 2 |
+
+`jolt-kernel` extracts the core verification logic (public input binding, continuation chaining) with a minimal TCB. The additional axioms here support the full 29-invariant TLA+ alignment.
+
 ## Future Work
 
 **Proof improvements**
-- Reduce axiom count by deriving composite assumptions from primitives
+- Further reduce axiom count by deriving from primitives
 - Add computational reflection via `native_decide`
 - Universe polymorphism audit
 
