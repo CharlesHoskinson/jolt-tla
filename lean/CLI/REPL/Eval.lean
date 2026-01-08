@@ -81,18 +81,29 @@ def evalOracleCmd (name : String) (args : Array String)
 
     | "verify" =>
       match argList with
-      | ["chain", path] =>
-        let (code, out) ← runVerifyChain path .plain state.config.toCaps
-        pure (code, out)
-      | [path] =>
-        -- Backwards compatibility
-        let (code, out) ← runVerifyChain path .plain state.config.toCaps
-        pure (code, out)
+      | ["chain", arg] =>
+        -- Check if argument is JSON content or file path
+        let trimmed := arg.trim
+        if trimmed.startsWith "{" then
+          let (code, out) ← runVerifyChainFromContent trimmed .plain state.config.toCaps
+          pure (code, out)
+        else
+          let (code, out) ← runVerifyChain arg .plain state.config.toCaps
+          pure (code, out)
+      | [arg] =>
+        -- Backwards compatibility: single arg is chain file/content
+        let trimmed := arg.trim
+        if trimmed.startsWith "{" then
+          let (code, out) ← runVerifyChainFromContent trimmed .plain state.config.toCaps
+          pure (code, out)
+        else
+          let (code, out) ← runVerifyChain arg .plain state.config.toCaps
+          pure (code, out)
       | ["vectors", path] =>
         let code ← verifyVectorsMain [path]
         pure (ExitCode.fromUInt32 code, "")
       | _ =>
-        pure (.invalid, "Usage: verify chain <file> | verify vectors <file>\n")
+        pure (.invalid, "Usage: verify chain <file> | verify chain $var | verify vectors <file>\n")
 
     | "generate" =>
       match argList with

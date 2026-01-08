@@ -165,6 +165,92 @@ where
       Doc.status icons true "Chain verification passed"
     ]
 
+/-- Run verify chain from raw JSON content (for REPL variable support).
+
+Returns (ExitCode, output string). -/
+def runVerifyChainFromContent (content : String) (format : OutputFormat := .pretty)
+    (caps : Caps := Caps.plain) : IO (ExitCode × String) := do
+  let bytes := content.toUTF8
+
+  -- Parse JSON and extract chain
+  let chain ← match parseChainBytes bytes with
+    | .ok c => pure c
+    | .error e =>
+      let report := ErrorReport.fromCode e
+      return (exitCodeForError e, formatErrorContent format report.codeString report.message none none)
+
+  -- Verify chain
+  let cfg := Oracle.init
+  match Oracle.verifyChain cfg chain with
+  | .ok () =>
+    let output := formatSuccessContent format chain.programHash chain.chunks.size caps
+    return (.success, output)
+  | .error e =>
+    let report := ErrorReport.fromCode e
+    let chunkIdx := extractChunkIndexContent e
+    return (exitCodeForError e, formatErrorContent format report.codeString
+      report.message chunkIdx (some chain.chunks.size))
+
+where
+  /-- Extract chunk index from error code if applicable. -/
+  extractChunkIndexContent (e : ErrorCode) : Option Nat :=
+    match e with
+    | .E500_ChainBreak i => some i
+    | .E501_DigestMismatch i => some i
+    | _ => none
+
+  /-- Format error output based on format. -/
+  formatErrorContent (format : OutputFormat) (code : String) (message : String)
+      (chunkIdx : Option Nat) (totalChunks : Option Nat) : String :=
+    match format with
+    | .json | .ndjson =>
+      let basePairs := [
+        ("status", jsonString "MISMATCH"),
+        ("error", jsonString code),
+        ("message", jsonString message)
+      ]
+      let idxPairs := match chunkIdx with
+        | some i => [("chunk_index", jsonNat i)]
+        | none => []
+      let totalPairs := match totalChunks with
+        | some n => [("total_chunks", jsonNat n)]
+        | none => []
+      jsonObject (basePairs ++ idxPairs ++ totalPairs) ++ "\n"
+    | .pretty | .plain =>
+      let idxLine := match chunkIdx with
+        | some i => s!"\n  at chunk: {i}"
+        | none => ""
+      s!"Error: {code}\n  {message}{idxLine}\n"
+
+  /-- Format success output based on format. -/
+  formatSuccessContent (format : OutputFormat) (programHash : Bytes32)
+      (chunksVerified : Nat) (caps : Caps) : String :=
+    match format with
+    | .json | .ndjson =>
+      jsonObject [
+        ("status", jsonString "VERIFIED"),
+        ("chunks_verified", jsonNat chunksVerified)
+      ] ++ "\n"
+    | .pretty | .plain =>
+      let hashHex := bytes32ToHexVerify programHash
+      let doc := buildVerifyDocContent hashHex chunksVerified caps
+      renderPlain doc
+
+  /-- Build Doc for verify output. -/
+  buildVerifyDocContent (programHash : String) (chunksVerified : Nat) (caps : Caps) : Doc :=
+    let icons := selectIcons caps
+    Doc.vcat [
+      Doc.headerBar "Jolt Oracle" (some "verify chain"),
+      Doc.line,
+      Doc.keyValue [
+        Doc.kvStr "Program Hash" (truncateHexVerify programHash 40),
+        Doc.kvStr "Chunks Verified" (toString chunksVerified),
+        Doc.kv "Status" (Doc.healthy "VERIFIED")
+      ],
+      Doc.line,
+      Doc.status icons true "Chain verification passed"
+    ]
+
 /-- Main entry point for verify chain command. -/
 def verifyChainMain (args : List String) : IO UInt32 := do
   match args with
