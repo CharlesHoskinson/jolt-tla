@@ -142,6 +142,7 @@ jobs:
 
       - name: "Non-vacuity: MC_BadChain_Splice (expect failure)"
         run: |
+          set -o pipefail
           echo "=== MC_BadChain_Splice: Testing INV_ATK_NoSplice ===" | tee -a negative-tests.log
           echo "Expected: TLC should find invariant violation" | tee -a negative-tests.log
 
@@ -151,7 +152,7 @@ jobs:
             -workers auto \
             tla/MC_BadChain_Splice.tla 2>&1 | tee -a negative-tests.log
 
-          TLC_EXIT=$?
+          TLC_EXIT=${PIPESTATUS[0]}
           if [ $TLC_EXIT -eq 0 ]; then
             echo "FAIL: TLC should have found invariant violation but succeeded"
             exit 1
@@ -160,6 +161,7 @@ jobs:
 
       - name: "Non-vacuity: MC_BadChain_Skip (expect failure)"
         run: |
+          set -o pipefail
           echo "=== MC_BadChain_Skip: Testing INV_ATK_NoSkipChunk ===" | tee -a negative-tests.log
           echo "Expected: TLC should find invariant violation" | tee -a negative-tests.log
 
@@ -169,7 +171,7 @@ jobs:
             -workers auto \
             tla/MC_BadChain_Skip.tla 2>&1 | tee -a negative-tests.log
 
-          TLC_EXIT=$?
+          TLC_EXIT=${PIPESTATUS[0]}
           if [ $TLC_EXIT -eq 0 ]; then
             echo "FAIL: TLC should have found invariant violation but succeeded"
             exit 1
@@ -178,6 +180,7 @@ jobs:
 
       - name: "Pattern A: MC_BadRegistry_ExternalHandle (expect success)"
         run: |
+          set -o pipefail
           echo "=== MC_BadRegistry_ExternalHandle: External handles blocked ===" | tee -a negative-tests.log
           echo "Expected: TLC should succeed (external handles prevented by type system)" | tee -a negative-tests.log
 
@@ -187,7 +190,7 @@ jobs:
             -workers auto \
             tla/MC_BadRegistry_ExternalHandle.tla 2>&1 | tee -a negative-tests.log
 
-          TLC_EXIT=$?
+          TLC_EXIT=${PIPESTATUS[0]}
           if [ $TLC_EXIT -ne 0 ]; then
             echo "FAIL: Invariant should hold (external handles blocked)"
             exit 1
