@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$comment": "Canonical constants manifest for Jolt TLA+ / Lean alignment",
+  "version": "0.3.1",
+
+  "registry": {
+    "$comment": "Registry key sets per spec section 3.4",
+    "required_keys": [
+      "JOLT_BATCH_COMMITMENT_V1",
+      "JOLT_BATCH_MANIFEST_ENCODING_V1",
+      "JOLT_CHECKPOINTS_ENCODING_V1",
+      "JOLT_CONTEXT_BYTES32_V1",
+      "JOLT_CONTINUATIONS_V1",
+      "JOLT_GUEST_MEMMAP_V1",
+      "JOLT_IMPL_COMMIT_V1",
+      "JOLT_MAX_CHECKPOINTS_BYTES_V1",
+      "JOLT_MAX_INTENTS_V1",
+      "JOLT_MAX_MANIFEST_BYTES_V1",
+      "JOLT_PCS_V1",
+      "JOLT_POSEIDON_FR_V1",
+      "JOLT_RISCV_PROFILE_V1",
+      "JOLT_RISCV_UNPRIV_SPEC_V1",
+      "JOLT_TOOLCHAIN_V1",
+      "JOLT_TRANSCRIPT_SCHEDULE_V1",
+      "JOLT_WRAPPER_PROOF_SYSTEM_V1"
+    ],
+    "required_keys_count": 17,
+    "external_handles": [
+      "JOLT_CONFORMANCE_BUNDLE_HASH_V1",
+      "JOLT_PARAMETER_REGISTRY_HASH_V1",
+      "JOLT_WRAPPER_VK_HASH_V1"
+    ],
+    "external_handles_count": 3,
+    "key_format_regex": "^JOLT_[A-Z0-9_]+_V[0-9]+$"
+  },
+
+  "transcript": {
+    "$comment": "Transcript type tags per spec section 8.4",
+    "type_tags": {
+      "TYPE_BYTES_FR": 1,
+      "TYPE_U64_FR": 2,
+      "TYPE_TAG_FR": 3,
+      "TYPE_VEC_FR": 4
+    }
+  },
+
+  "domain_tags": {
+    "$comment": "All domain tags per spec section 8.6, sorted alphabetically",
+    "tags": [
+      "JOLT/BATCH/COMMIT/V1",
+      "JOLT/BATCH/EMPTY_FILL_LEAF/V1",
+      "JOLT/BATCH/FILL_LEAF/V1",
+      "JOLT/BATCH/HEADER_LEAF/V1",
+      "JOLT/BATCH/NODE/V1",
+      "JOLT/BATCH/PAD_LEAF/V1",
+      "JOLT/CHECKPOINTS/DIGEST/V1",
+      "JOLT/CHECKPOINTS/V1",
+      "JOLT/CONFIG_TAGS/V1",
+      "JOLT/IO/INIT/V1",
+      "JOLT/SMT/NODE/V1",
+      "JOLT/SMT/PAGE/V1",
+      "JOLT/STATE/V1",
+      "JOLT/TAG/V1",
+      "JOLT/TRANSCRIPT/CHALLENGE/V1",
+      "JOLT/TRANSCRIPT/V1",
+      "JOLT/TRANSCRIPT/VM_STATE/V1"
+    ],
+    "tags_count": 17,
+    "format_requirements": {
+      "prefix": "JOLT/",
+      "charset": "[A-Z0-9/_]",
+      "min_length": 5
+    }
+  },
+
+  "poseidon": {
+    "$comment": "JOLT_POSEIDON_FR_V1 parameters per spec section 3.4.1",
+    "width": 3,
+    "rate": 2,
+    "capacity": 1,
+    "full_rounds": 8,
+    "partial_rounds": 60,
+    "total_rounds": 68,
+    "sbox_alpha": 5,
+    "security_bits": 128,
+    "field": "BLS12-381 scalar field"
+  },
+
+  "status": {
+    "$comment": "Status semantics - INCONSISTENT across sources, requires resolution",
+    "lean_enum": {
+      "Success": 0,
+      "Failure": 1,
+      "Pending": 2
+    },
+    "spec_md": "u8 exit code (0..255) encoded as Fr",
+    "resolution_status": "UNRESOLVED"
+  }
+}
