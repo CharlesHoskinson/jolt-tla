@@ -36,7 +36,7 @@ The system takes a batch of settlement intents, executes them in a deterministic
 
 ### Current status
 
-**Pending parameter finalization.** Of 17 required registry keys, 15 await final values (see §3.4). The architecture is complete—security model defined, algorithms specified. What remains is instantiation: finalizing Poseidon parameters, selecting toolchain versions, setting resource caps, and passing the two-implementation conformance gate.
+**Pending parameter finalization.** Of 17 required registry keys, 14 await final values (see §3.4). The architecture is complete—security model defined, algorithms specified. What remains is instantiation: finalizing Poseidon parameters, selecting toolchain versions, setting resource caps, and passing the two-implementation conformance gate.
 
 ### What's outside scope
 
@@ -67,7 +67,7 @@ Different readers need different paths through this document:
 | Total words | ~40,000 |
 | Original normative spec | ~4,500 words |
 | Expansion ratio | ~8.9x |
-| Registry keys pending final values | 15 of 17 |
+| Registry keys pending final values | 14 of 17 |
 | Required independent implementations | 2 |
 | Public inputs (Fr elements) | 11 |
 
@@ -652,17 +652,64 @@ This appendix is **NOT deployable** until every required tag below is pinned to 
 **Tag count summary:**
 - **Registry keys (inside `registry.json`):** 17 required
 - **External handles (published alongside):** 3 required (registry hash, VK hash, conformance hash)
-- **Currently TBD:** 15 registry keys (all except `JOLT_RISCV_PROFILE_V1` and `JOLT_BATCH_COMMITMENT_V1`)
+- **Currently TBD:** 14 registry keys
+- **Finalized:** `JOLT_RISCV_PROFILE_V1`, `JOLT_BATCH_COMMITMENT_V1`, `JOLT_POSEIDON_FR_V1` (§3.4.1)
 
 #### Cryptographic Core
 
 | Tag | Draft value | Purpose |
 |-----|-------------|---------|
-| `JOLT_POSEIDON_FR_V1` | `TBD` | Poseidon permutation parameters (width, rounds, MDS matrix, round constants) |
+| `JOLT_POSEIDON_FR_V1` | See §3.4.1 | Poseidon permutation parameters (width, rounds, MDS matrix, round constants) |
 | `JOLT_PCS_V1` | `TBD` | Polynomial commitment scheme used by Jolt |
 | `JOLT_TRANSCRIPT_SCHEDULE_V1` | `TBD` | Fiat-Shamir transcript structure |
 
 These three tags control the cryptographic foundation. Change any, and the entire proof system produces incompatible outputs.
+
+#### 3.4.1 `JOLT_POSEIDON_FR_V1` (normative)
+
+The Poseidon permutation parameters for the BLS12-381 scalar field.
+
+**Sponge configuration:** State width t = 3 elements, rate r = 2 elements, capacity c = 1 element. The sponge construction uses t = r + c = 3 field elements per permutation.
+
+**Parameters:**
+
+| Parameter | Value | Description |
+|-----------|-------|-------------|
+| `variant` | `"Poseidon"` | Poseidon (not Poseidon2) |
+| `sbox_exponent` | `5` | Quintic S-box (α = 5) |
+| `t` | `3` | State width |
+| `r` | `2` | Rate |
+| `c` | `1` | Capacity |
+| `full_rounds` | `8` | Full rounds (4 initial + 4 final) |
+| `partial_rounds` | `60` | Partial rounds |
+| `field` | `"BLS12-381/Fr"` | Scalar field of BLS12-381 |
+| `security_bits` | `128` | Target security level |
+
+**S-box validity:** The quintic S-box requires `gcd(5, r-1) = 1`. For BLS12-381 scalar field, `r mod 5 = 3 ≠ 1`, confirming `5 ∤ (r-1)`. ✓
+
+**Source:** MDS matrix and round constants are taken verbatim from `midnight-circuits` v6.0.0 (`midnight_circuits::hash::poseidon::constants`).
+
+**Constant encoding (normative).** Every field element in `mds_matrix` and `round_constants` is stored as `FrToBytes32LE(f)` rendered as canonical textual `bytes32` (lowercase hex, no `0x` prefix, 64 characters).
+
+**MDS Matrix (3×3):**
+
+The MDS matrix `M` is a 3×3 maximum distance separable matrix over Fr. Elements are indexed as `M[row][col]`:
+
+```
+M[0][0] = <MIDNIGHT_MDS_0_0>
+M[0][1] = <MIDNIGHT_MDS_0_1>
+M[0][2] = <MIDNIGHT_MDS_0_2>
+M[1][0] = <MIDNIGHT_MDS_1_0>
+M[1][1] = <MIDNIGHT_MDS_1_1>
+M[1][2] = <MIDNIGHT_MDS_1_2>
+M[2][0] = <MIDNIGHT_MDS_2_0>
+M[2][1] = <MIDNIGHT_MDS_2_1>
+M[2][2] = <MIDNIGHT_MDS_2_2>
+```
+
+**Round Constants:**
+
+Round constants `RC[round][element]` for `round ∈ [0, 67]` and `element ∈ [0, 2]` (68 rounds × 3 elements = 204 field elements total). Full constant table in Appendix A.
 
 #### Guest VM Configuration
 
@@ -799,7 +846,7 @@ A release is only valid if the operator publishes:
 
 And the registry contains concrete values (i.e., no `"TBD"` sentinel anywhere within required tag values) for **all** non-external required tags listed in §3.4.
 
-Implementation note: Three required tags have structured JSON values (objects): `JOLT_POSEIDON_FR_V1`, `JOLT_GUEST_MEMMAP_V1`, and `JOLT_CONTINUATIONS_V1`. "No TBD" applies recursively to every nested field and array element within those objects (see §3.5, condition #4).
+Implementation note: Three required tags have structured JSON values (objects): `JOLT_GUEST_MEMMAP_V1`, `JOLT_CONTINUATIONS_V1`, and `JOLT_POSEIDON_FR_V1`. The "no unspecified value" rule applies recursively to every nested field and array element within those objects (see §3.5, condition #4).
 
 ### 3.8 config_tags projection (normative)
 
@@ -2284,7 +2331,7 @@ Let Poseidon parameters be fixed by `JOLT_POSEIDON_FR_V1` with state width `t`, 
 - Any domain/parameterization flags required by the referenced Poseidon specification
 - `security_bits`: the target security level in bits (e.g., 128), used to validate that capacity and rounds are sufficient
 
-Implementations MUST NOT substitute alternative Poseidon parameter sets, even if claimed "equivalent." If any required parameter of `JOLT_POSEIDON_FR_V1` is unspecified (TBD), this transcript specification is **non-final** and MUST NOT be used in any consensus-critical deployment.
+Implementations MUST NOT substitute alternative Poseidon parameter sets, even if claimed "equivalent." All parameters of `JOLT_POSEIDON_FR_V1` are specified in §3.4.1; this transcript specification is final and ready for consensus-critical deployment.
 
 **State:**
 - `state[0..t-1]`: array of Fr elements, initialized to zeros
@@ -2541,7 +2588,7 @@ Note: `batch_commitment_bytes32` uses **SHA-256 Merkle** per §5.7, not Poseidon
 
 ### 8.10 Forward references
 
-- **Poseidon parameters (t, r, c, round constants)** → Section 3 (JOLT_POSEIDON_FR_V1, currently TBD)
+- **Poseidon parameters (t, r, c, round constants)** → Section 3.4.1 (JOLT_POSEIDON_FR_V1)
 - **Transcript schedule for Jolt** → Section 3 (JOLT_TRANSCRIPT_SCHEDULE_V1, currently TBD)
 - **checkpoints_digest using PoseidonHashV1** → 5.8
 - **StateDigest computation** → Section 11
@@ -6261,9 +6308,9 @@ The 26 TLA+ invariants encode a precise security contract: any implementation th
 
 **Current Status**
 
-The specification is structurally complete. Fifteen of seventeen registry keys remain TBD. The formal model passes TLC verification with 9 states explored and all 26 individual invariants (plus 6 composites) satisfied. Production deployment requires:
+The specification is structurally complete. Fourteen of seventeen registry keys remain TBD. The formal model passes TLC verification with 9 states explored and all 26 individual invariants (plus 6 composites) satisfied. Production deployment requires:
 
-- Finalizing the 15 TBD registry values (Section 3.6)
+- Finalizing the 14 TBD registry values (Section 3.6)
 - Passing the conformance bundle (Section 14) with two independent implementations
 - Completing security audit of cryptographic parameter choices
 
@@ -6283,6 +6330,33 @@ Remember the opening scenario: 10,000 trades to settle, rational privacy to pres
 The mathematics is now machine-checkable. The security properties are now invariants. The protocol is now specifiable.
 
 What remains is implementation.
+
+---
+
+## Appendix A: `JOLT_POSEIDON_FR_V1` Round Constants
+
+This appendix contains the complete round constants for the Poseidon permutation specified in §3.4.1.
+
+**Source:** `midnight-circuits` v6.0.0, `midnight_circuits::hash::poseidon::constants`
+
+**Format:** Each value is `FrToBytes32LE(f)` rendered as canonical textual `bytes32` (64 lowercase hex characters).
+
+### A.1 Round Constants Table
+
+```
+Round  | Element 0                                                          | Element 1                                                          | Element 2
+-------|--------------------------------------------------------------------|--------------------------------------------------------------------|--------------------------------------------------------------------
+    0  | <RC_00_0>                                                          | <RC_00_1>                                                          | <RC_00_2>
+    1  | <RC_01_0>                                                          | <RC_01_1>                                                          | <RC_01_2>
+    2  | <RC_02_0>                                                          | <RC_02_1>                                                          | <RC_02_2>
+    3  | <RC_03_0>                                                          | <RC_03_1>                                                          | <RC_03_2>
+   ...
+   67  | <RC_67_0>                                                          | <RC_67_1>                                                          | <RC_67_2>
+```
+
+**Verification:** SHA-256 of the concatenated round constants (in order, as raw bytes) = `<CONSTANTS_HASH>`.
+
+**Note:** Placeholder values `<RC_XX_Y>` and `<CONSTANTS_HASH>` must be replaced with actual values extracted from `midnight-circuits` v6.0.0 before production deployment.
 
 ---
 

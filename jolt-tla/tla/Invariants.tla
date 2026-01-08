@@ -10,8 +10,8 @@
 (* Purpose: Centralized collection of all specification invariants          *)
 (* Section Reference: §15 (Security), all module constraints                *)
 (* Version: 1.0                                                             *)
-(* Notes: 26 individual invariants + 6 composites organized by category:    *)
-(*        - INV_TYPE_*  : Type well-formedness (4, medium severity)         *)
+(* Notes: 27 individual invariants + 6 composites organized by category:    *)
+(*        - INV_TYPE_*  : Type well-formedness (5, medium severity)         *)
 (*        - INV_BIND_*  : Cryptographic binding (7, critical severity)      *)
 (*        - INV_SAFE_*  : Protocol correctness (7, high severity)           *)
 (*        - INV_ATK_*   : Attack prevention (8, critical severity)          *)
@@ -40,11 +40,16 @@ INV_TYPE_VMState ==
 
 INV_TYPE_ProgramHash == sys.programHash \in Bytes32
 
+\* INV_TYPE_PoseidonParams: Verify JOLT_POSEIDON_FR_V1 parameters are valid (§3.4.1)
+\* This is a constant invariant - validates the hash parameters at startup
+INV_TYPE_PoseidonParams == PoseidonParamsValid
+
 INV_TYPE_All ==
     /\ INV_TYPE_SystemState
     /\ INV_TYPE_Registry
     /\ INV_TYPE_VMState
     /\ INV_TYPE_ProgramHash
+    /\ INV_TYPE_PoseidonParams
 
 (****************************************************************************)
 (* BINDING INVARIANTS (CRITICAL)                                             *)

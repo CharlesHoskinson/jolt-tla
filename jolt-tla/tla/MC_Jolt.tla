@@ -83,6 +83,24 @@ ModelSHA256Hash(input) ==
 ModelDefaultHashes == [d \in 0..32 |-> (d * 17 + 1) % FR_TLC_BOUND]
 
 (****************************************************************************)
+(* POSEIDON PARAMETERS (§3.4.1)                                              *)
+(* JOLT_POSEIDON_FR_V1 concrete parameter values for model checking          *)
+(****************************************************************************)
+
+\* Poseidon parameters (t, r, c naming convention per §3.4.1)
+POSEIDON_T == 3                            \* State width: t = 3
+POSEIDON_R == 2                            \* Rate: r = 2
+POSEIDON_C == 1                            \* Capacity: c = 1
+
+\* Validate Poseidon parameter consistency with Hash.tla definitions
+ASSUME POSEIDON_T = POSEIDON_WIDTH
+ASSUME POSEIDON_R = POSEIDON_RATE
+ASSUME POSEIDON_C = POSEIDON_CAPACITY
+ASSUME POSEIDON_FULL_ROUNDS == 8
+ASSUME POSEIDON_PARTIAL_ROUNDS == 60
+ASSUME POSEIDON_T = POSEIDON_R + POSEIDON_C
+
+(****************************************************************************)
 (* STATE CONSTRAINTS                                                         *)
 (* Bounds on exploration to keep TLC tractable                               *)
 (****************************************************************************)

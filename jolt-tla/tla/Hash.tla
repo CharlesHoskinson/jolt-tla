@@ -36,6 +36,44 @@ CONSTANTS
     SHA256Hash(_)             \* (inputBytes) -> Bytes32
 
 (****************************************************************************)
+(* JOLT_POSEIDON_FR_V1 PARAMETERS (§3.4.1)                                   *)
+(* Concrete parameter values for Poseidon hash function                      *)
+(****************************************************************************)
+
+\* State width (t = 3)
+POSEIDON_WIDTH == 3
+
+\* Sponge rate (r = 2)
+POSEIDON_RATE == 2
+
+\* Sponge capacity (c = 1)
+POSEIDON_CAPACITY == 1
+
+\* Full rounds (RF = 8)
+POSEIDON_FULL_ROUNDS == 8
+
+\* Partial rounds (RP = 60)
+POSEIDON_PARTIAL_ROUNDS == 60
+
+\* Total rounds (RF + RP = 68)
+POSEIDON_TOTAL_ROUNDS == POSEIDON_FULL_ROUNDS + POSEIDON_PARTIAL_ROUNDS
+
+\* Security level in bits
+POSEIDON_SECURITY_BITS == 128
+
+\* S-box exponent (α = 5)
+POSEIDON_SBOX_ALPHA == 5
+
+\* Validate JOLT_POSEIDON_FR_V1 parameters
+PoseidonParamsValid ==
+    /\ POSEIDON_WIDTH = 3
+    /\ POSEIDON_RATE = 2
+    /\ POSEIDON_CAPACITY = 1
+    /\ POSEIDON_FULL_ROUNDS = 8
+    /\ POSEIDON_PARTIAL_ROUNDS = 60
+    /\ POSEIDON_WIDTH = POSEIDON_RATE + POSEIDON_CAPACITY
+
+(****************************************************************************)
 (* ASSUME: Collision resistance as injectivity within each domain           *)
 (* NOTE: Unbounded quantifiers are documented properties, not TLC-checked   *)
 (****************************************************************************)
