@@ -380,8 +380,8 @@ Quoting: \"...\" expands $vars, '...' is literal
         let typeName := varTypeName v.value
         let value := formatValue state v
         let name := v.name.take 12
-        let padding1 := String.mk (List.replicate (14 - name.length) ' ')
-        let padding2 := String.mk (List.replicate (12 - typeName.length) ' ')
+        let padding1 := String.ofList (List.replicate (14 - name.length) ' ')
+        let padding2 := String.ofList (List.replicate (12 - typeName.length) ' ')
         s!"{name}{padding1}{typeName}{padding2}{value}"
       header ++ String.intercalate "\n" lines.toList ++ "\n"
 

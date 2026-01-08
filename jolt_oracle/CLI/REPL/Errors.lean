@@ -118,10 +118,10 @@ def renderError (e : ParseError) (input : String) (caps : UiCaps) : String :=
   let sourceLine := s!"  {input}\n"
 
   -- Caret line: spaces for indent + prefix, then caret(s)
-  let caretPadding := String.mk (List.replicate (2 + e.span.start) ' ')
+  let caretPadding := String.ofList (List.replicate (2 + e.span.start) ' ')
   let caretLength := max 1 e.span.length
   let carets := if caretLength == 1 then "^"
-    else "^" ++ String.mk (List.replicate (caretLength - 1) '~')
+    else "^" ++ String.ofList (List.replicate (caretLength - 1) '~')
   let caretLine := s!"{caretPadding}{theme.err}{carets}{theme.reset}\n"
 
   -- Optional hint
@@ -135,10 +135,10 @@ def renderError (e : ParseError) (input : String) (caps : UiCaps) : String :=
 def renderErrorPlain (e : ParseError) (input : String) : String :=
   let header := s!"Parse error: {e.msg}\n"
   let sourceLine := s!"  {input}\n"
-  let caretPadding := String.mk (List.replicate (2 + e.span.start) ' ')
+  let caretPadding := String.ofList (List.replicate (2 + e.span.start) ' ')
   let caretLength := max 1 e.span.length
   let carets := if caretLength == 1 then "^"
-    else "^" ++ String.mk (List.replicate (caretLength - 1) '~')
+    else "^" ++ String.ofList (List.replicate (caretLength - 1) '~')
   let caretLine := s!"{caretPadding}{carets}\n"
   let hintLine := match e.hint with
     | some h => s!"Hint: {h}\n"
@@ -168,7 +168,7 @@ def ReplError.message : ReplError → String
   | .internal msg => s!"Internal error: {msg}"
 
 /-- Convert ReplError to ParseError for display. -/
-def ReplError.toParseError (e : ReplError) (inputLen : Nat := 0) : ParseError :=
+def ReplError.toParseError (e : ReplError) (_inputLen : Nat := 0) : ParseError :=
   match e with
   | .parse pe => pe
   | .aliasLoop name =>

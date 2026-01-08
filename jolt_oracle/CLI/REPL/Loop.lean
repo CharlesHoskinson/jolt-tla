@@ -50,7 +50,7 @@ def readLine : IO (Option String) := do
 /-- Check if a line should be recorded in history.
     Lines starting with space are not recorded (secrets convention). -/
 def shouldRecordHistory (line : String) : Bool :=
-  !line.isEmpty && line.get? 0 != some ' '
+  !line.isEmpty && line.toList[0]? != some ' '
 
 /-- Handle multi-line input for JSON. -/
 partial def readMultiLine (state : ReplState) (caps : UiCaps) (buffer : String)

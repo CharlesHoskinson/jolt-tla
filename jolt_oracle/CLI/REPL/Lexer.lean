@@ -41,11 +41,11 @@ def atEnd (l : Lexer) : Bool := l.pos >= l.input.length
 
 /-- Peek at the current character without consuming. -/
 def peek (l : Lexer) : Option Char :=
-  l.input.get? ⟨l.pos⟩
+  l.input.toList[l.pos]?
 
 /-- Peek at the next character (pos + 1). -/
 def peekNext (l : Lexer) : Option Char :=
-  l.input.get? ⟨l.pos + 1⟩
+  l.input.toList[l.pos + 1]?
 
 /-- Advance position by n characters. -/
 def advance (l : Lexer) (n : Nat := 1) : Lexer :=
