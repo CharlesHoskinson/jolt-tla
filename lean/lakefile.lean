@@ -7,6 +7,10 @@ package jolt_oracle where
 require Cli from git
   "https://github.com/leanprover/lean4-cli" @ "v4.26.0"
 
+-- NearFall formal verification library (required for CI)
+lean_lib NearFall where
+  roots := #[`NearFall]
+
 @[default_target]
 lean_lib Jolt where
   roots := #[`Jolt]
