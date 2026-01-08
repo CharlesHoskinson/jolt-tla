@@ -19,6 +19,49 @@ ASSUME U64_TLC_BOUND <= FR_TLC_BOUND
 U64ToFr(u) == u
 
 (****************************************************************************)
+(* JOLT_WRAPPER_PROOF_SYSTEM_V1: Midnight-compatible proof system config    *)
+(* Section Reference: §5.2, CLAUDE_UPDATE_PLAN_JOLT_WRAPPER_PROOF_SYSTEM_V1 *)
+(* These constants pin the proof system for byte-exact compatibility        *)
+(****************************************************************************)
+
+WrapperProofSystemV1 == [
+    \* Proof system identity
+    curve |-> "BLS12-381",
+    pcs |-> "KZG",
+    k |-> 14,
+    domain_size |-> 16384,  \* 2^14
+
+    \* SRS identity
+    srs_id |-> "bls_midnight_2p14",
+    \* srs_hash: TODO(NEEDS_EVIDENCE) - SHA-256 of actual Midnight SRS blob bytes
+
+    \* Wire format tags
+    proof_container |-> "proof-versioned",
+    proof_tag |-> "proof[v5]",
+    vk_tag |-> "verifier-key[v6]",
+    binding_domain |-> "midnight:binding-input[v1]",
+
+    \* Public input contract
+    pub_inputs_len |-> 11,
+    pub_inputs_order |-> <<
+        "program_hash_lo", "program_hash_hi",
+        "old_root_lo", "old_root_hi",
+        "new_root_lo", "new_root_hi",
+        "batch_commitment_lo", "batch_commitment_hi",
+        "checkpoints_digest_fr", "status_fr", "batch_nonce_fr"
+    >>,
+
+    \* Encoding
+    fr_encoding |-> "FrToBytes32LE",
+    serialized_size |-> 352  \* 11 × 32 bytes
+]
+
+\* Convenience accessors
+WRAPPER_PROOF_SYSTEM_CURVE == WrapperProofSystemV1.curve
+WRAPPER_PROOF_SYSTEM_K == WrapperProofSystemV1.k
+WRAPPER_PUBLIC_INPUTS_COUNT == WrapperProofSystemV1.pub_inputs_len
+
+(****************************************************************************)
 (* PublicInputsV1: The 11 Fr values exposed to on-chain verifier            *)
 (* These are the only values the verifier sees; all else is hidden          *)
 (****************************************************************************)
@@ -134,5 +177,75 @@ TrapOutputs(trapCode, batchNonceIn) == [
     status_u8 |-> trapCode % 256, reserved7 |-> ZeroReserved7, batch_nonce_u64 |-> batchNonceIn,
     old_root_bytes32 |-> ZeroBytes32, new_root_bytes32 |-> ZeroBytes32,
     batch_commitment_bytes32 |-> ZeroBytes32, checkpoints_digest_bytes32 |-> ZeroBytes32]
+
+(****************************************************************************)
+(* §4.2 ValidWrapperPayload: Fail-closed verification predicate            *)
+(* Any mismatch implies rejection - no state transition occurs             *)
+(* Reference: CLAUDE_UPDATE_PLAN_JOLT_WRAPPER_PROOF_SYSTEM_V1 section 4.2  *)
+(****************************************************************************)
+
+\* Check that wire format tags match pinned constants
+ValidWireFormatTags(payload) ==
+    /\ payload.proof_container_tag = WrapperProofSystemV1.proof_container
+    /\ payload.proof_inner_tag = WrapperProofSystemV1.proof_tag
+    /\ payload.vk_tag = WrapperProofSystemV1.vk_tag
+
+\* Check that public inputs have correct count and order
+ValidPublicInputsFormat(inputs) ==
+    /\ Len(inputs) = WrapperProofSystemV1.pub_inputs_len
+    /\ PublicInputsTypeOK(inputs)
+
+\* Check that SRS identity matches (modeled as string equality)
+ValidSRSIdentity(payload) ==
+    payload.srs_id = WrapperProofSystemV1.srs_id
+
+\* Check that proof system parameters match
+ValidProofSystemParams(payload) ==
+    /\ payload.curve = WrapperProofSystemV1.curve
+    /\ payload.pcs = WrapperProofSystemV1.pcs
+    /\ payload.k = WrapperProofSystemV1.k
+
+\* Combined validation: ALL checks must pass for payload to be valid
+\* Any mismatch causes rejection (fail-closed)
+ValidWrapperPayload(payload, publicInputs) ==
+    /\ ValidWireFormatTags(payload)
+    /\ ValidPublicInputsFormat(publicInputs)
+    /\ ValidSRSIdentity(payload)
+    /\ ValidProofSystemParams(payload)
+
+\* Explicit rejection predicate (for clarity in specs)
+RejectWrapperPayload(payload, publicInputs) ==
+    ~ValidWrapperPayload(payload, publicInputs)
+
+(****************************************************************************)
+(* §4.3 Nonce Replay Protection                                             *)
+(* Tracks used nonces to prevent replay attacks                             *)
+(* Reference: CLAUDE_UPDATE_PLAN_JOLT_WRAPPER_PROOF_SYSTEM_V1 section 4.3  *)
+(****************************************************************************)
+
+\* State variable: set of already-used binding digests or nonces
+\* In a model, this would be declared as: VARIABLE usedNonces
+\* Here we define predicates for checking nonce validity
+
+\* Check if nonce has been used before
+NonceAlreadyUsed(nonce, usedNonces) ==
+    nonce \in usedNonces
+
+\* Check if nonce is fresh (not previously used)
+NonceFresh(nonce, usedNonces) ==
+    nonce \notin usedNonces
+
+\* Monotonic nonce policy: new nonce must be greater than all previous
+MonotonicNoncePolicy(newNonce, usedNonces) ==
+    \A usedNonce \in usedNonces : newNonce > usedNonce
+
+\* Accept nonce and update used set (for Next action)
+AcceptNonce(nonce, usedNonces) ==
+    usedNonces' = usedNonces \cup {nonce}
+
+\* Complete wrapper validation including replay protection
+ValidWrapperSubmission(payload, publicInputs, nonce, usedNonces) ==
+    /\ ValidWrapperPayload(payload, publicInputs)
+    /\ NonceFresh(nonce, usedNonces)
 
 ====
