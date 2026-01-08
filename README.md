@@ -4,7 +4,7 @@
 
 [![TLA+ CI](https://github.com/CharlesHoskinson/jolt-tla/actions/workflows/tlaplus.yml/badge.svg)](https://github.com/CharlesHoskinson/jolt-tla/actions/workflows/tlaplus.yml)
 [![Lean CI](https://github.com/CharlesHoskinson/jolt-tla/actions/workflows/lean.yml/badge.svg)](https://github.com/CharlesHoskinson/jolt-tla/actions/workflows/lean.yml)
-[![Version](https://img.shields.io/badge/version-0.3.0-blue)]()
+[![Version](https://img.shields.io/badge/version-0.3.1-blue)]()
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 ```
@@ -119,6 +119,52 @@ The oracle is correctness-first and fail-closed. Malformed inputs get rejected, 
 
 ---
 
+## What's New in v0.3.1
+
+### Modular TLA+ Now Canonical
+
+The modular specification (`tla/MC_Jolt.tla`) is now the canonical entrypoint:
+
+- **19 TLA+ modules** with proper separation of concerns
+- **CI updated** to use modular harness
+- **Monolith generation** script for single-file deployments
+
+### Registry Expanded to 17 Keys
+
+`Registry.tla` now includes all required configuration keys per §3.4:
+
+- **17 required keys**: `JOLT_POSEIDON_FR_V1` through `JOLT_WRAPPER_PROOF_SYSTEM_V1`
+- **3 external handles**: Computed tags that MUST NOT appear in registry.json
+- **Key format validation**: `^JOLT_[A-Z0-9_]+_V[0-9]+$`
+
+### Status Enum Aligned with Lean
+
+`status_fr` now uses Status enum `{0,1,2}` matching Lean Jolt implementation:
+
+| Value | Meaning |
+|-------|---------|
+| 0 | SUCCESS (halted with exit_code = 0) |
+| 1 | FAILURE (halted with exit_code > 0) |
+| 2 | PENDING (not yet halted) |
+
+### Domain Tags Centralized
+
+All 17 domain tags now defined in `Hash.tla` with `IsValidTagFormat` validation:
+
+- Tags must start with `JOLT/`
+- Charset: `[A-Z0-9/_]`
+- Cardinality verified by ASSUME
+
+### New Modules
+
+- **Tar.tla**: TAR archive validation per §14.3 (path safety, canonical ordering)
+- **JSON.tla**: JSON safety constraints per §2.6.1 (safe integers, JCS)
+- **Bundle.tla**: Conformance bundle structure (TAR + JSON + Registry)
+- **RegistryValidationTests.tla**: 19 test cases for registry validation
+- **TranscriptValidationTests.tla**: 28 test cases for transcript validation
+
+---
+
 ## What's New in v0.3.0
 
 ### Poseidon Parameters Finalized
@@ -199,7 +245,7 @@ We don't just specify behavior—we specify what "secure" means, then prove it.
 
 | Layer | What It Is | Who It's For |
 |-------|-----------|--------------|
-| `JoltContinuations.tla` | Executable TLA+ model (~900 lines) | Auditors, verification engineers |
+| `tla/MC_Jolt.tla` | Modular TLA+ spec (19 modules, canonical) | Auditors, verification engineers |
 | `lean/` | Machine-checked Lean 4 kernel + Oracle CLI (~8K lines) | Formal verification, production |
 | `spec.md` | Prose specification (~40K words) | Implementers, researchers |
 
@@ -245,12 +291,12 @@ sha256sum tla2tools.jar
 ### Run the Model Checker
 
 ```bash
-# Parse
-java -cp tla2tools.jar tla2sany.SANY JoltContinuations.tla
+# Parse (canonical modular entrypoint)
+java -cp tla2tools.jar tla2sany.SANY tla/MC_Jolt.tla
 
 # Check all 30 invariants
 java -XX:+UseParallelGC -Xmx4g -jar tla2tools.jar \
-  -config Jolt.cfg JoltContinuations.tla -workers auto
+  -config Jolt.cfg tla/MC_Jolt.tla -workers auto
 ```
 
 **Expected:**
@@ -280,21 +326,26 @@ jolt-tla/
 │   ├── tlaplus.yml          # TLA+ verification
 │   └── lean.yml             # Lean 4 build
 │
-├── tla/                     # Modular TLA+ sources
+├── tla/                     # Modular TLA+ sources (canonical)
 │   ├── Types.tla            # Fr, U64, Bytes32
 │   ├── Encodings.tla        # Byte/field conversions
-│   ├── Hash.tla             # Hash abstraction
-│   ├── Transcript.tla       # Fiat-Shamir sponge
+│   ├── Hash.tla             # Hash + 17 domain tags (centralized)
+│   ├── Transcript.tla       # Fiat-Shamir sponge + type tags
 │   ├── SMT.tla              # Sparse Merkle Tree
 │   ├── SMTOps.tla           # SMT operations
 │   ├── VMState.tla          # RISC-V state machine
-│   ├── Registry.tla         # Config management
+│   ├── Registry.tla         # 17 keys + 3 external handles
 │   ├── Continuations.tla    # Chunk chaining
-│   ├── Wrapper.tla          # Proof wrapper (§5.2)
-│   ├── WrapperValidationTests.tla  # 15 validation tests
-│   ├── JoltSpec.tla         # Top-level
+│   ├── Wrapper.tla          # Proof wrapper + Status enum
+│   ├── Tar.tla              # TAR archive validation (§14.3)
+│   ├── JSON.tla             # JSON safety + JCS (§2.6.1)
+│   ├── Bundle.tla           # Conformance bundle structure
+│   ├── RegistryValidationTests.tla   # Registry test cases
+│   ├── TranscriptValidationTests.tla # Transcript test cases
+│   ├── WrapperValidationTests.tla    # 15 validation tests
+│   ├── JoltSpec.tla         # Top-level composition
 │   ├── Invariants.tla       # All 30 invariants
-│   └── MC_Jolt.tla          # Model check harness
+│   └── MC_Jolt.tla          # Model check harness (canonical)
 │
 ├── lean/                    # Lean 4 executable spec
 │   ├── Jolt/                # Core modules
@@ -317,7 +368,12 @@ jolt-tla/
 ├── docs/
 │   ├── architecture.md
 │   ├── invariants.md
+│   ├── alignment.md         # TLA/Lean/spec alignment matrix
 │   └── module-reference.md
+│
+├── scripts/
+│   ├── check_alignment.sh   # CI diff-check for constants
+│   └── generate_monolith.sh # Generate single-file TLA
 │
 ├── CONTRIBUTING.md
 ├── SECURITY.md
@@ -413,9 +469,9 @@ jolt> quit              # Exit REPL
 
 ## Status
 
-**Released** — v0.3.0
+**Released** — v0.3.1
 
-Feature-complete with executable specification. All 30 invariants pass. Oracle CLI provides conformance testing.
+Feature-complete with executable specification. All 30 invariants pass. Oracle CLI provides conformance testing. TLA+ aligned with Lean Jolt oracle (Status enum, 17 registry keys, 17 domain tags).
 
 See [CHANGELOG.md](CHANGELOG.md).
 
