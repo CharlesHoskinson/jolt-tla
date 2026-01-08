@@ -76,11 +76,14 @@ partial def collectArgs (p : Parser) (acc : Array String) : Parser × Array Stri
   match p.current with
   | some tok =>
     match tok.kind with
-    | .word | .string | .rawString | .variable =>
+    | .word | .string | .rawString =>
       collectArgs p.advance (acc.push tok.text)
+    | .variable =>
+      -- Prepend $ so expandVariables can recognize variable references
+      collectArgs p.advance (acc.push s!"${tok.text}")
     | .lbrace | .lbracket =>
-      -- Start of JSON, collect everything
-      collectJsonArg p acc
+      -- Start of JSON as a new argument
+      collectJsonArg p (acc.push "")
     | _ => (p, acc)
   | none => (p, acc)
 where
@@ -95,7 +98,9 @@ where
         let newAcc := if acc.isEmpty then #[text]
           else
             let last := acc.back!
-            acc.pop.push (last ++ " " ++ text)
+            -- Don't add space if last is empty (start of new JSON arg)
+            if last.isEmpty then acc.pop.push text
+            else acc.pop.push (last ++ " " ++ text)
         collectJsonArg p.advance newAcc
     | none => (p, acc)
 

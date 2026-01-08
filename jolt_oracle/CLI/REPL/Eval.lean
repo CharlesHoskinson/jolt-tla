@@ -65,21 +65,38 @@ def evalOracleCmd (name : String) (args : Array String)
   let (exitCode, output) ← match name with
     | "digest" =>
       match argList with
-      | [path] =>
-        let (code, out) ← runDigest path .plain state.config.toCaps
-        pure (code, out)
+      | [arg] =>
+        -- Detect JSON content vs file path
+        let trimmed := arg.trim
+        if trimmed.startsWith "{" then
+          let (code, out) ← runDigestFromContent trimmed .plain state.config.toCaps
+          pure (code, out)
+        else
+          let (code, out) ← runDigest arg .plain state.config.toCaps
+          pure (code, out)
       | _ =>
         pure (.invalid, "Usage: digest <state.json>\n")
 
     | "verify" =>
       match argList with
-      | ["chain", path] =>
-        let (code, out) ← runVerifyChain path .plain state.config.toCaps
-        pure (code, out)
-      | [path] =>
-        -- Backwards compatibility
-        let (code, out) ← runVerifyChain path .plain state.config.toCaps
-        pure (code, out)
+      | ["chain", arg] =>
+        -- Detect JSON content vs file path
+        let trimmed := arg.trim
+        if trimmed.startsWith "{" then
+          let (code, out) ← runVerifyChainFromContent trimmed .plain state.config.toCaps
+          pure (code, out)
+        else
+          let (code, out) ← runVerifyChain arg .plain state.config.toCaps
+          pure (code, out)
+      | [arg] =>
+        -- Backwards compatibility - also detect JSON content
+        let trimmed := arg.trim
+        if trimmed.startsWith "{" then
+          let (code, out) ← runVerifyChainFromContent trimmed .plain state.config.toCaps
+          pure (code, out)
+        else
+          let (code, out) ← runVerifyChain arg .plain state.config.toCaps
+          pure (code, out)
       | ["vectors", path] =>
         let code ← verifyVectorsMain [path]
         pure (ExitCode.fromUInt32 code, "")
@@ -104,7 +121,8 @@ def evalOracleCmd (name : String) (args : Array String)
     | "diff" =>
       match argList with
       | [expected, actual] =>
-        let (code, out) ← runDiff expected actual .plain state.config.toCaps
+        -- Use runDiffMixed to support both file paths and JSON content (from variables)
+        let (code, out) ← runDiffMixed expected actual .plain state.config.toCaps
         pure (code, out)
       | _ =>
         pure (.invalid, "Usage: diff <expected.json> <actual.json>\n")
