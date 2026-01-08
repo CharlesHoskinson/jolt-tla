@@ -184,11 +184,13 @@ jobs:
           echo "Expected: TLC should succeed (external handles prevented by type system)" | tee -a negative-tests.log
 
           # Run TLC and capture exit code (expect 0 for success)
+          # Use -deadlock flag since we expect termination, not progress
           TLC_EXIT=0
           java -XX:+UseParallelGC -Xmx2g \
             -jar tla2tools.jar \
             -config BadRegistry_ExternalHandle.cfg \
             -workers auto \
+            -deadlock \
             tla/MC_BadRegistry_ExternalHandle.tla 2>&1 >> negative-tests.log || TLC_EXIT=$?
 
           if [ $TLC_EXIT -ne 0 ]; then
