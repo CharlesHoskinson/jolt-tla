@@ -82,8 +82,8 @@ partial def collectArgs (p : Parser) (acc : Array String) : Parser × Array Stri
       -- Prepend $ so expandVariables can recognize variable references
       collectArgs p.advance (acc.push s!"${tok.text}")
     | .lbrace | .lbracket =>
-      -- Start of JSON, collect everything
-      collectJsonArg p acc
+      -- Start of JSON as a new argument
+      collectJsonArg p (acc.push "")
     | _ => (p, acc)
   | none => (p, acc)
 where
@@ -98,7 +98,9 @@ where
         let newAcc := if acc.isEmpty then #[text]
           else
             let last := acc.back!
-            acc.pop.push (last ++ " " ++ text)
+            -- Don't add space if last is empty (start of new JSON arg)
+            if last.isEmpty then acc.pop.push text
+            else acc.pop.push (last ++ " " ++ text)
         collectJsonArg p.advance newAcc
     | none => (p, acc)
 
@@ -176,7 +178,8 @@ def parseBuiltin (p : Parser) : ParseResult (Parser × ReplCmd) := do
           match getArg args 0 with
           | some path =>
             let cont := hasArg args "--continue"
-            .ok <| ReplCmd.source path cont
+            let echo := hasArg args "--echo"
+            .ok <| ReplCmd.source path cont echo
           | none => .ok <| ReplCmd.help (some "source")
         | "show" =>
           match getArg args 0 with
@@ -207,6 +210,12 @@ def parseBuiltin (p : Parser) : ParseResult (Parser × ReplCmd) := do
           | none => .ok <| ReplCmd.help (some "examples")
         | "cheatsheet" => .ok ReplCmd.cheatsheet
         | "version" => .ok ReplCmd.version
+        -- Beauty layer builtins (P0½)
+        | "banner" =>
+          let subCmd := getArg args 0 |>.getD "show"
+          .ok <| ReplCmd.banner subCmd
+        | "theme" => .ok ReplCmd.theme
+        | "doctor" => .ok ReplCmd.doctor
         | _ =>
           -- Unknown builtin
           .error (ParseError.unknownCommand s!":{name}" nameTok.span)

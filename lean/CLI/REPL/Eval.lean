@@ -1,4 +1,5 @@
 import CLI.REPL.Parser
+import CLI.REPL.UI
 import CLI.Commands.Digest
 import CLI.Commands.Verify
 import CLI.Commands.VerifyVectors
@@ -23,8 +24,8 @@ namespace CLI.REPL
 open CLI.Commands
 open CLI.Report
 
-/-- Version string for the REPL. -/
-def replVersion : String := "Jolt Oracle REPL v0.1.0"
+/-- Version string for the REPL (full). -/
+def replVersionString : String := "Jolt Oracle REPL v0.1.0"
 
 /-- Convert ReplConfig to Caps. -/
 def ReplConfig.toCaps (c : ReplConfig) : CLI.Terminal.Caps :=
@@ -66,23 +67,21 @@ def evalOracleCmd (name : String) (args : Array String)
     | "digest" =>
       match argList with
       | [arg] =>
-        -- Check if argument is JSON content (starts with {) or a file path
+        -- Detect JSON content vs file path
         let trimmed := arg.trim
         if trimmed.startsWith "{" then
-          -- Argument is inline JSON content (from variable expansion)
           let (code, out) ← runDigestFromContent trimmed .plain state.config.toCaps
           pure (code, out)
         else
-          -- Argument is a file path
           let (code, out) ← runDigest arg .plain state.config.toCaps
           pure (code, out)
       | _ =>
-        pure (.invalid, "Usage: digest <state.json> or digest $var\n")
+        pure (.invalid, "Usage: digest <state.json>\n")
 
     | "verify" =>
       match argList with
       | ["chain", arg] =>
-        -- Check if argument is JSON content or file path
+        -- Detect JSON content vs file path
         let trimmed := arg.trim
         if trimmed.startsWith "{" then
           let (code, out) ← runVerifyChainFromContent trimmed .plain state.config.toCaps
@@ -91,7 +90,7 @@ def evalOracleCmd (name : String) (args : Array String)
           let (code, out) ← runVerifyChain arg .plain state.config.toCaps
           pure (code, out)
       | [arg] =>
-        -- Backwards compatibility: single arg is chain file/content
+        -- Backwards compatibility - also detect JSON content
         let trimmed := arg.trim
         if trimmed.startsWith "{" then
           let (code, out) ← runVerifyChainFromContent trimmed .plain state.config.toCaps
@@ -103,7 +102,7 @@ def evalOracleCmd (name : String) (args : Array String)
         let code ← verifyVectorsMain [path]
         pure (ExitCode.fromUInt32 code, "")
       | _ =>
-        pure (.invalid, "Usage: verify chain <file> | verify chain $var | verify vectors <file>\n")
+        pure (.invalid, "Usage: verify chain <file> | verify vectors <file>\n")
 
     | "generate" =>
       match argList with
@@ -123,7 +122,8 @@ def evalOracleCmd (name : String) (args : Array String)
     | "diff" =>
       match argList with
       | [expected, actual] =>
-        let (code, out) ← runDiff expected actual .plain state.config.toCaps
+        -- Use runDiffMixed to support both file paths and JSON content (from variables)
+        let (code, out) ← runDiffMixed expected actual .plain state.config.toCaps
         pure (code, out)
       | _ =>
         pure (.invalid, "Usage: diff <expected.json> <actual.json>\n")
@@ -162,6 +162,204 @@ where
     | 3 => .unhealthy
     | 4 => .invalid
     | _ => .ioError
+
+/-- Get the configuration directory path.
+    Unix:    ~/.jolt
+    Windows: %APPDATA%/jolt (fallback: %USERPROFILE%/.jolt) -/
+def getConfigDir : IO System.FilePath := do
+  if System.Platform.isWindows then
+    match ← IO.getEnv "APPDATA" with
+    | some appdata => return appdata / "jolt"
+    | none =>
+      match ← IO.getEnv "USERPROFILE" with
+      | some home => return home / ".jolt"
+      | none => return ".jolt"
+  else
+    let home := (← IO.getEnv "HOME").getD "~"
+    return home / ".jolt"
+
+/-- Get the config file path. -/
+def getConfigPath : IO System.FilePath := do
+  let dir ← getConfigDir
+  return dir / "repl.json"
+
+/-- Convert ColorMode to string for JSON. -/
+private def colorModeToString : CLI.Terminal.ColorMode → String
+  | .auto => "auto"
+  | .always => "always"
+  | .never => "never"
+
+/-- Parse ColorMode from string. -/
+private def parseColorMode (s : String) : Option CLI.Terminal.ColorMode :=
+  match s with
+  | "auto" => some .auto
+  | "always" => some .always
+  | "never" => some .never
+  | _ => none
+
+/-- Convert OutputFormat to string for JSON. -/
+private def outputFormatToString : CLI.Terminal.OutputFormat → String
+  | .plain => "plain"
+  | .pretty => "pretty"
+  | .json => "json"
+  | .ndjson => "ndjson"
+
+/-- Parse OutputFormat from string. -/
+private def parseOutputFormat (s : String) : Option CLI.Terminal.OutputFormat :=
+  match s with
+  | "plain" => some .plain
+  | "pretty" => some .pretty
+  | "json" => some .json
+  | "ndjson" => some .ndjson
+  | _ => none
+
+/-- Build config JSON string. -/
+private def configToJson (config : ReplConfig) (aliases : Array Alias) : String :=
+  let aliasLines := aliases.map fun a =>
+    s!"    \"{a.name}\": \"{a.expansion}\""
+  let aliasStr := if aliases.isEmpty then "{}" else
+    "{\n" ++ String.intercalate ",\n" aliasLines.toList ++ "\n  }"
+  s!"\{
+  \"version\": 1,
+  \"banner\": \"{config.banner}\",
+  \"color\": \"{colorModeToString config.color}\",
+  \"pretty\": {config.pretty},
+  \"outFormat\": \"{outputFormatToString config.outFormat}\",
+  \"maxPreviewBytes\": {config.maxPreviewBytes},
+  \"aliases\": {aliasStr}
+}"
+
+/-- Save configuration to file (atomic write). -/
+def saveConfig (state : ReplState) : IO (ExitCode × String) := do
+  let configPath ← getConfigPath
+  let configDir ← getConfigDir
+  let tmpPath := configPath.toString ++ ".tmp"
+
+  try
+    -- Ensure directory exists
+    IO.FS.createDirAll configDir
+
+    -- Build JSON
+    let json := configToJson state.config state.aliases
+
+    -- Atomic write: write to tmp, then rename
+    IO.FS.writeFile tmpPath json
+
+    -- On Windows: remove dest first if exists (rename can fail otherwise)
+    if System.Platform.isWindows then
+      try IO.FS.removeFile configPath catch _ => pure ()
+
+    IO.FS.rename tmpPath configPath
+
+    return (.success, s!"Config saved to {configPath}\n")
+  catch e =>
+    -- Clean up tmp file if it exists
+    try IO.FS.removeFile tmpPath catch _ => pure ()
+    return (.ioError, s!"Error saving config: {e}\n")
+
+/-- Simple JSON value extraction (minimal parser for config). -/
+private def extractJsonString (content : String) (key : String) : Option String := do
+  let pattern := s!"\"{key}\": \""
+  let parts := content.splitOn pattern
+  if parts.length < 2 then none
+  else
+    let rest := parts[1]!
+    let endIdx := rest.toList.findIdx (· == '"')
+    some (rest.take endIdx)
+
+/-- Extract JSON boolean. -/
+private def extractJsonBool (content : String) (key : String) : Option Bool := do
+  let pattern := s!"\"{key}\": "
+  let parts := content.splitOn pattern
+  if parts.length < 2 then none
+  else
+    let rest := parts[1]!
+    if rest.startsWith "true" then some true
+    else if rest.startsWith "false" then some false
+    else none
+
+/-- Extract JSON number. -/
+private def extractJsonNat (content : String) (key : String) : Option Nat := do
+  let pattern := s!"\"{key}\": "
+  let parts := content.splitOn pattern
+  if parts.length < 2 then none
+  else
+    let rest := parts[1]!
+    let numStr := rest.takeWhile (fun c => c.isDigit)
+    numStr.toNat?
+
+/-- Extract aliases from JSON config. -/
+private def extractAliases (content : String) : Array Alias := Id.run do
+  -- Find "aliases": { ... }
+  let parts := content.splitOn "\"aliases\": {"
+  if parts.length < 2 then return #[]
+
+  let rest := parts[1]!
+  let endIdx := rest.toList.findIdx (· == '}')
+  let aliasContent := rest.take endIdx
+
+  -- Parse individual aliases
+  let mut aliases : Array Alias := #[]
+  let lines := aliasContent.splitOn "\n"
+  for line in lines do
+    let trimmed := line.trim
+    if trimmed.isEmpty || trimmed == "," then continue
+    -- Parse "name": "expansion"
+    let keyParts := trimmed.splitOn "\": \""
+    if keyParts.length >= 2 then
+      let name := (keyParts[0]!.dropWhile (· != '"')).drop 1
+      let expansion := keyParts[1]!.dropRightWhile (· != '"') |>.dropRight 1
+      if !name.isEmpty && !expansion.isEmpty then
+        aliases := aliases.push { name, expansion }
+  aliases
+
+/-- Load configuration from file. -/
+def loadConfig (state : ReplState) : IO (ReplState × String) := do
+  let configPath ← getConfigPath
+
+  -- Check if file exists
+  if !(← configPath.pathExists) then
+    return (state, s!"No config file at {configPath}\n")
+
+  try
+    let content ← IO.FS.readFile configPath
+
+    -- Check version
+    let version := extractJsonNat content "version" |>.getD 0
+    if version != 1 then
+      return (state, s!"Warning: Unknown config version {version}, ignoring\n")
+
+    -- Parse fields with fallbacks to current values
+    let banner := extractJsonString content "banner"
+      |>.bind (fun s => parseBannerMode (some s))
+      |>.getD state.config.banner
+    let color := extractJsonString content "color"
+      |>.bind parseColorMode
+      |>.getD state.config.color
+    let pretty := extractJsonBool content "pretty"
+      |>.getD state.config.pretty
+    let outFormat := extractJsonString content "outFormat"
+      |>.bind parseOutputFormat
+      |>.getD state.config.outFormat
+    let maxPreviewBytes := extractJsonNat content "maxPreviewBytes"
+      |>.getD state.config.maxPreviewBytes
+
+    let aliases := extractAliases content
+
+    let newConfig : ReplConfig := {
+      banner, color, pretty, outFormat, maxPreviewBytes,
+      pager := state.config.pager,
+      timeout := state.config.timeout
+    }
+
+    let newState := { state with
+      config := newConfig
+      aliases := if aliases.isEmpty then state.aliases else aliases
+    }
+
+    return (newState, s!"Config loaded from {configPath}\n")
+  catch e =>
+    return (state, s!"Error loading config: {e}\n")
 
 /-- Evaluate a builtin command. -/
 def evalBuiltin (cmd : ReplCmd) (state : ReplState) : IO (ReplState × ReplOutput) := do
@@ -230,10 +428,6 @@ def evalBuiltin (cmd : ReplCmd) (state : ReplState) : IO (ReplState × ReplOutpu
     | none =>
       pure (state, ReplOutput.stderr s!"Error: Variable not found: ${varName}\n")
 
-  | .source _path _continueOnError =>
-    -- TODO: Implement script sourcing
-    pure (state, ReplOutput.stderr "Script sourcing not yet implemented\n")
-
   | .show_ varName full =>
     let out := formatShow state varName full
     pure (state, ReplOutput.stdout out)
@@ -269,11 +463,28 @@ def evalBuiltin (cmd : ReplCmd) (state : ReplState) : IO (ReplState × ReplOutpu
     pure (state', ReplOutput.stdout "Session reset\n")
 
   | .config subCmd =>
-    let out := match subCmd with
-      | "path" => s!"Config path: {configPath}\n"
-      | "show" => formatConfig state.config
-      | _ => s!"Unknown config command: {subCmd}\n"
-    pure (state, ReplOutput.stdout out)
+    match subCmd with
+    | "path" =>
+      let path ← getConfigPath
+      pure (state, ReplOutput.stdout s!"Config path: {path}\n")
+    | "show" =>
+      let out := formatConfig state.config
+      pure (state, ReplOutput.stdout out)
+    | "save" =>
+      let (code, msg) ← saveConfig state
+      if code == .success then
+        pure (state, ReplOutput.stdout msg)
+      else
+        pure (state, ReplOutput.stderr msg)
+    | "load" =>
+      let (newState, msg) ← loadConfig state
+      pure (newState, ReplOutput.stdout msg)
+    | "reset" =>
+      let defaultConfig : ReplConfig := {}
+      let state' := { state with config := defaultConfig }
+      pure (state', ReplOutput.stdout "Config reset to defaults (not saved)\n")
+    | _ =>
+      pure (state, ReplOutput.stderr s!"Unknown config command: {subCmd}\nUsage: :config [show|save|load|path|reset]\n")
 
   | .redact enable =>
     let newMode := match enable with
@@ -292,7 +503,71 @@ def evalBuiltin (cmd : ReplCmd) (state : ReplState) : IO (ReplState × ReplOutpu
     pure (state, ReplOutput.stdout out)
 
   | .version =>
-    pure (state, ReplOutput.stdout s!"{replVersion}\n")
+    pure (state, ReplOutput.stdout s!"{replVersionString}\n")
+
+  -- Beauty layer builtins (P0½)
+  | .banner subCmd =>
+    match subCmd with
+    | "show" =>
+      -- Replay the banner
+      let caps : UiCaps := default  -- Will be updated when we have caps in state
+      let theme := getTheme caps
+      let out := renderBanner caps theme
+      pure (state, ReplOutput.stdout out)
+    | "on" =>
+      let state' := { state with config := { state.config with banner := .always } }
+      pure (state', ReplOutput.stdout "Banner mode: always\n")
+    | "off" =>
+      let state' := { state with config := { state.config with banner := .never } }
+      pure (state', ReplOutput.stdout "Banner mode: never\n")
+    | "auto" =>
+      let state' := { state with config := { state.config with banner := .auto } }
+      pure (state', ReplOutput.stdout "Banner mode: auto\n")
+    | _ =>
+      pure (state, ReplOutput.stderr s!"Unknown banner subcommand: {subCmd}\nUsage: :banner [show|on|off|auto]\n")
+
+  | .theme =>
+    let caps : UiCaps := default
+    let colorStr := if caps.color then "enabled" else "disabled"
+    let unicodeStr := if caps.unicode then "enabled" else "disabled"
+    let interactiveStr := if caps.isInteractive then "yes" else "no"
+    let out := s!"Terminal Capabilities:
+  Color:       {colorStr}
+  Unicode:     {unicodeStr}
+  Interactive: {interactiveStr}
+  Width:       {caps.termWidth}
+  Height:      {caps.termHeight}
+"
+    pure (state, ReplOutput.stdout out)
+
+  | .doctor =>
+    -- Sanity check: TTY? Colors? Config path? History path?
+    let stdinTty ← IO.FS.Stream.isTty (← IO.getStdin)
+    let stderrTty ← IO.FS.Stream.isTty (← IO.getStderr)
+    let noColor := (← IO.getEnv "NO_COLOR").isSome
+    let term := (← IO.getEnv "TERM").getD "(not set)"
+    let cfgPath ← getConfigPath
+
+    let checkMark := "+"
+    let crossMark := "!"
+    let stdin := if stdinTty then s!"{checkMark} stdin is TTY" else s!"{crossMark} stdin is not TTY"
+    let stderr := if stderrTty then s!"{checkMark} stderr is TTY" else s!"{crossMark} stderr is not TTY"
+    let noColorLine := if noColor then s!"{crossMark} NO_COLOR is set" else s!"{checkMark} NO_COLOR not set"
+    let termLine := s!"  TERM={term}"
+
+    let out := s!"Doctor Report:
+  {stdin}
+  {stderr}
+  {noColorLine}
+{termLine}
+  Config path: {cfgPath}
+  Banner mode: {state.config.banner}
+  Color mode:  {state.config.color}
+  Variables:   {state.variables.size}
+  Aliases:     {state.aliases.size}
+  History:     {state.history.size} entries
+"
+    pure (state, ReplOutput.stdout out)
 
   | _ =>
     pure (state, ReplOutput.stderr "Internal error: unexpected command\n")
@@ -308,13 +583,6 @@ where
     | [] => name
     | [n] => n
     | h :: _ => h
-
-  configPath : String :=
-    -- Platform-specific config path
-    if System.Platform.isWindows then
-      "%APPDATA%\\jolt\\repl.json"
-    else
-      "~/.config/jolt/repl.json"
 
   formatHelp (topic : Option String) : String :=
     match topic with
@@ -345,7 +613,9 @@ VARIABLES
 SCRIPTING
   :alias <n> = <cmd>      Define command alias
   :unalias <name>         Remove alias
-  :source <file>          Run script file
+  :source <file> [opts]   Run script file
+     --continue           Continue after errors
+     --echo               Print commands as executed
   :history [filter]       Show command history
 
 SESSION
@@ -361,6 +631,9 @@ DISPLAY
   :examples <cmd>         Show command examples
   :cheatsheet             Quick reference card
   :version                Show version info
+  :banner [show|on|off|auto]  Manage startup banner
+  :theme                  Show terminal capabilities
+  :doctor                 System diagnostics
   :quit                   Exit REPL
 
 Special variables: $_ (last output), $? (exit code)
@@ -374,6 +647,11 @@ Quoting: \"...\" expands $vars, '...' is literal
     | "set" => ":set <key> <value>\n  Set a config option or variable.\n  Use :set secret.<name> for secrets (redacted in output).\n"
     | "alias" => ":alias <name> = <expansion>\n  Define a command alias.\n  Example: :alias d = digest\n"
     | "load" => ":load <file> [as <var>]\n  Load file contents into a variable.\n  Example: :load state.json as s1\n"
+    | "source" => ":source <file> [--continue] [--echo]\n  Execute commands from a script file.\n  Uses full REPL parsing (multi-line JSON, aliases, variables).\n  --continue  Continue execution after errors\n  --echo      Print each command to stderr before execution\n  Example: :source setup.oracle --echo\n"
+    | "banner" => ":banner [show|on|off|auto]\n  Manage the startup banner.\n  show  - Display the banner now\n  on    - Always show banner on startup\n  off   - Never show banner on startup\n  auto  - Show banner when stderr is a TTY (default)\n"
+    | "theme" => ":theme\n  Display terminal capabilities:\n  - Color support\n  - Unicode support\n  - Interactive mode\n  - Terminal dimensions\n"
+    | "doctor" => ":doctor\n  Run system diagnostics:\n  - TTY detection (stdin, stderr)\n  - NO_COLOR environment variable\n  - TERM environment variable\n  - Config path and current settings\n  - Session stats (variables, aliases, history)\n"
+    | "config" => ":config [show|save|load|path|reset]\n  Manage REPL configuration.\n  show   - Display current settings\n  save   - Save settings to config file (atomic)\n  load   - Reload settings from config file\n  path   - Show config file path\n  reset  - Reset settings to defaults (not saved)\n"
     | _ => s!"No help available for '{topic}'\n"
 
   formatHistory (history : Array String) (filter : Option String) : String :=
@@ -487,8 +765,15 @@ Examples:
   :alias d = digest
 "
 
+/-- Helper: Check if multi-line JSON input needs more lines. -/
+def needsMoreInput (s : String) : Bool :=
+  let trimmed := s.trim
+  (trimmed.startsWith "{" || trimmed.startsWith "[") && !isBalanced trimmed
+
+mutual
+
 /-- Evaluate a command (dispatch to builtin or oracle). -/
-def evalCmd (cmd : ReplCmd) (state : ReplState) : IO EvalResult := do
+partial def evalCmd (cmd : ReplCmd) (state : ReplState) : IO EvalResult := do
   match cmd with
   | .quit =>
     return .exit 0
@@ -547,13 +832,18 @@ def evalCmd (cmd : ReplCmd) (state : ReplState) : IO EvalResult := do
     | none =>
       return .continue state (ReplOutput.stderr s!"Variable not found: ${name}\n")
 
+  | .source path continueOnError echo =>
+    -- Handle :source directly in evalCmd to avoid forward reference
+    let (state', output) ← evalSourceInline path continueOnError echo state
+    return .continue state' output
+
   | _ =>
     -- Builtin commands
     let (state', output) ← evalBuiltin cmd state
     return .continue state' output
 
 /-- Evaluate a line of input (with parsing). -/
-def evalLine (input : String) (state : ReplState) : IO EvalResult := do
+partial def evalLine (input : String) (state : ReplState) : IO EvalResult := do
   -- Parse the line
   match parse input with
   | .error e =>
@@ -567,5 +857,90 @@ def evalLine (input : String) (state : ReplState) : IO EvalResult := do
       return .continue state (ReplOutput.stderr errMsg)
     | .ok expandedCmd =>
       evalCmd expandedCmd state
+
+/-- Execute commands from a script file (called after evalCmd to avoid forward reference). -/
+partial def evalSourceInline (path : String) (continueOnError : Bool) (echo : Bool)
+    (state : ReplState) : IO (ReplState × ReplOutput) := do
+  -- Check recursion depth
+  if state.sourceDepth >= maxSourceDepth then
+    return (state, ReplOutput.stderr s!"Error: Source depth exceeded ({maxSourceDepth})\n")
+
+  let state := { state with sourceDepth := state.sourceDepth + 1 }
+
+  -- Read file
+  let content ← try
+    IO.FS.readFile path
+  catch _ =>
+    return ({ state with sourceDepth := state.sourceDepth - 1 },
+            ReplOutput.stderr s!"Error: Cannot read file: {path}\n")
+
+  -- Process lines
+  let mut currentState := state
+  let mut lineBuffer : Array String := #[]
+  let mut lineNum : Nat := 0
+  let mut lastCode := ExitCode.success
+  let mut accOutput := ReplOutput.empty
+
+  for rawLine in content.splitOn "\n" do
+    lineNum := lineNum + 1
+    let line := rawLine.dropRightWhile (· == '\r')  -- Handle CRLF
+
+    -- Skip comments
+    if line.trimLeft.startsWith "#" then
+      continue
+
+    -- Accumulate multi-line
+    lineBuffer := lineBuffer.push line
+    let fullLine := String.intercalate "\n" lineBuffer.toList
+
+    if needsMoreInput fullLine then
+      continue
+
+    lineBuffer := #[]
+
+    -- Skip empty accumulated input
+    if fullLine.trim.isEmpty then
+      continue
+
+    -- Echo if requested
+    if echo then
+      accOutput := accOutput.append (ReplOutput.stderr s!"  {lineNum}: {fullLine.take 60}...\n")
+
+    -- Parse with full REPL parser
+    match parse fullLine with
+    | .ok cmd =>
+      -- Expand aliases
+      match expandAliases currentState cmd with
+      | .error e =>
+        accOutput := accOutput.append (ReplOutput.stderr s!"Error at {path}:{lineNum}: {e.message}\n")
+        if !continueOnError then
+          return ({ currentState with sourceDepth := state.sourceDepth - 1 }, accOutput)
+      | .ok expandedCmd =>
+        let result ← evalCmd expandedCmd currentState
+        match result with
+        | .continue newState output =>
+          currentState := newState
+          lastCode := newState.lastExitCode
+          accOutput := accOutput.append output
+
+          if lastCode != .success && !continueOnError then
+            accOutput := accOutput.append (ReplOutput.stderr s!"Error at {path}:{lineNum}\n")
+            return ({ currentState with sourceDepth := state.sourceDepth - 1 }, accOutput)
+        | .exit _ =>
+          -- Ignore :quit in sourced scripts
+          pure ()
+    | .error e =>
+      accOutput := accOutput.append (ReplOutput.stderr s!"Parse error at {path}:{lineNum}:\n  {e.msg}\n")
+      if !continueOnError then
+        return ({ currentState with sourceDepth := state.sourceDepth - 1 }, accOutput)
+
+  return ({ currentState with sourceDepth := state.sourceDepth - 1 }, accOutput)
+
+end  -- mutual
+
+/-- Execute commands from a script file (external API). -/
+def evalSource (path : String) (continueOnError : Bool) (echo : Bool)
+    (state : ReplState) : IO (ReplState × ReplOutput) :=
+  evalSourceInline path continueOnError echo state
 
 end CLI.REPL

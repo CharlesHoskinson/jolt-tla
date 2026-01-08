@@ -165,9 +165,7 @@ where
       Doc.status icons true "Chain verification passed"
     ]
 
-/-- Run verify chain from raw JSON content (for REPL variable support).
-
-Returns (ExitCode, output string). -/
+/-- Run verify chain from raw JSON content (for REPL variable support). -/
 def runVerifyChainFromContent (content : String) (format : OutputFormat := .pretty)
     (caps : Caps := Caps.plain) : IO (ExitCode × String) := do
   let bytes := content.toUTF8
@@ -187,19 +185,17 @@ def runVerifyChainFromContent (content : String) (format : OutputFormat := .pret
     return (.success, output)
   | .error e =>
     let report := ErrorReport.fromCode e
-    let chunkIdx := extractChunkIndexContent e
+    let chunkIdx := extractChunkIdx e
     return (exitCodeForError e, formatErrorContent format report.codeString
       report.message chunkIdx (some chain.chunks.size))
 
 where
-  /-- Extract chunk index from error code if applicable. -/
-  extractChunkIndexContent (e : ErrorCode) : Option Nat :=
+  extractChunkIdx (e : ErrorCode) : Option Nat :=
     match e with
     | .E500_ChainBreak i => some i
     | .E501_DigestMismatch i => some i
     | _ => none
 
-  /-- Format error output based on format. -/
   formatErrorContent (format : OutputFormat) (code : String) (message : String)
       (chunkIdx : Option Nat) (totalChunks : Option Nat) : String :=
     match format with
@@ -222,7 +218,6 @@ where
         | none => ""
       s!"Error: {code}\n  {message}{idxLine}\n"
 
-  /-- Format success output based on format. -/
   formatSuccessContent (format : OutputFormat) (programHash : Bytes32)
       (chunksVerified : Nat) (caps : Caps) : String :=
     match format with
@@ -233,23 +228,19 @@ where
       ] ++ "\n"
     | .pretty | .plain =>
       let hashHex := bytes32ToHexVerify programHash
-      let doc := buildVerifyDocContent hashHex chunksVerified caps
+      let icons := selectIcons caps
+      let doc := Doc.vcat [
+        Doc.headerBar "Jolt Oracle" (some "verify chain"),
+        Doc.line,
+        Doc.keyValue [
+          Doc.kvStr "Program Hash" (truncateHexVerify hashHex 40),
+          Doc.kvStr "Chunks Verified" (toString chunksVerified),
+          Doc.kv "Status" (Doc.healthy "VERIFIED")
+        ],
+        Doc.line,
+        Doc.status icons true "Chain verification passed"
+      ]
       renderPlain doc
-
-  /-- Build Doc for verify output. -/
-  buildVerifyDocContent (programHash : String) (chunksVerified : Nat) (caps : Caps) : Doc :=
-    let icons := selectIcons caps
-    Doc.vcat [
-      Doc.headerBar "Jolt Oracle" (some "verify chain"),
-      Doc.line,
-      Doc.keyValue [
-        Doc.kvStr "Program Hash" (truncateHexVerify programHash 40),
-        Doc.kvStr "Chunks Verified" (toString chunksVerified),
-        Doc.kv "Status" (Doc.healthy "VERIFIED")
-      ],
-      Doc.line,
-      Doc.status icons true "Chain verification passed"
-    ]
 
 /-- Main entry point for verify chain command. -/
 def verifyChainMain (args : List String) : IO UInt32 := do

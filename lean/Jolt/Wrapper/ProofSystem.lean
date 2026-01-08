@@ -28,7 +28,7 @@ with Midnight's native verifier stack:
 ## References
 
 - Jolt Spec §5.2 (Public Inputs)
-- Jolt Spec §5.2.1 (Wrapper Proof System Configuration)
+- Midnight ledger protocol specification
 -/
 
 namespace Jolt.Wrapper

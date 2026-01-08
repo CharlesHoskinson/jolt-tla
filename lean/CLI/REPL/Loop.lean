@@ -16,12 +16,12 @@ namespace CLI.REPL
 
 open CLI.Terminal
 
-/-- Print the startup banner to stderr. -/
+/-- Print the startup banner to stderr.
+    Uses the ASCII art banner with color support. -/
 def printBanner (caps : UiCaps) : IO Unit := do
   let theme := getTheme caps
-  writelnStderr s!"{theme.bold}{replVersion}{theme.reset}"
-  writelnStderr "Type ':help' for commands, ':quit' to exit."
-  writelnStderr ""
+  let banner := renderBanner caps theme
+  writeStderr banner
 
 /-- Print output with proper stdout/stderr discipline. -/
 def printOutput (output : ReplOutput) : IO Unit := do
@@ -111,11 +111,33 @@ partial def replLoop (state : ReplState) (caps : UiCaps) : IO UInt32 := do
           printOutput output
           replLoop newState caps
 
-/-- Run the REPL with the given options. -/
+/-- Run the REPL with the given options.
+
+    Startup sequence (per plan refinement #9):
+    1. Detect raw TTY presence (independent of config)
+    2. Initialize state with defaults
+    3. Load config (future - may change color/banner preferences)
+    4. Compute final caps from TTY + loaded config
+    5. Show banner if appropriate (stderr TTY, not batch, banner mode allows) -/
 def runRepl (colorMode : ColorMode := .auto)
     (nonInteractive : Bool := false) : IO UInt32 := do
-  -- Detect capabilities
-  let caps ← detectCaps colorMode
+  -- 1. Detect raw TTY presence first (independent of config)
+  let stdinTty ← IO.FS.Stream.isTty (← IO.getStdin)
+  let stderrTty ← IO.FS.Stream.isTty (← IO.getStderr)
+
+  -- 2. Initialize state with defaults
+  let mut state : ReplState := {}
+
+  -- 3. Load config (TODO: implement loadConfig in P2)
+  -- state ← loadConfig state
+
+  -- 4. Compute final caps from TTY + config
+  -- Override colorMode from config if set differently
+  let effectiveColorMode := match state.config.color with
+    | .auto => colorMode
+    | mode => mode
+
+  let caps ← detectCaps effectiveColorMode
 
   -- Force non-interactive settings if requested
   let caps := if nonInteractive then
@@ -123,12 +145,13 @@ def runRepl (colorMode : ColorMode := .auto)
   else
     caps
 
-  -- Print banner (only in interactive mode)
-  if caps.isInteractive && !nonInteractive then
+  -- 5. Show banner if appropriate:
+  -- - stderr is a TTY (banner gated on stderr TTY per refinement #1)
+  -- - not in non-interactive mode
+  -- - banner mode is not .never
+  let showBanner := stderrTty && !nonInteractive && state.config.banner != .never
+  if showBanner then
     printBanner caps
-
-  -- Initialize state
-  let state : ReplState := {}
 
   -- Run the loop
   replLoop state caps

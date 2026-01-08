@@ -1,7 +1,7 @@
 import Lake
 open Lake DSL
 
-package jolt_lean where
+package jolt_oracle where
   leanOptions := #[⟨`autoImplicit, false⟩, ⟨`relaxedAutoImplicit, false⟩]
 
 require Cli from git
@@ -21,11 +21,8 @@ lean_lib CLI where
              `CLI.REPL.Types, `CLI.REPL.UI, `CLI.REPL.Errors, `CLI.REPL.Lexer,
              `CLI.REPL.Parser, `CLI.REPL.Eval, `CLI.REPL.Loop]
 
-lean_lib NearFall where
-  roots := #[`NearFall]
-
 lean_lib Tests where
-  roots := #[`Tests]
+  roots := #[`Tests.Main, `Tests.JSONParserTests, `Tests.CLITerminalTests, `Tests.REPLTests]
 
 lean_exe oracle where
   root := `CLI.Main

@@ -125,7 +125,7 @@ inductive ReplCmd where
   | unalias (name : String)
   | load (file : String) (varName : Option String)
   | save (varName : String) (file : String)
-  | source (path : String) (continueOnError : Bool)
+  | source (path : String) (continueOnError : Bool) (echo : Bool)
   | show_ (varName : String) (full : Bool)
   | type_ (expr : String)
   | push
@@ -136,6 +136,10 @@ inductive ReplCmd where
   | examples (cmd : String)
   | cheatsheet
   | version
+  -- Beauty layer builtins (P0½)
+  | banner (subCmd : String)  -- show, on, off, auto
+  | theme                      -- Show terminal capabilities
+  | doctor                     -- Sanity check
   -- Composition
   | varRef (name : String)
   | pipe (left : ReplCmd) (right : ReplCmd)
@@ -143,9 +147,17 @@ inductive ReplCmd where
   | noop
   deriving Repr, Inhabited
 
+/-- Banner display mode (imported from UI). -/
+inductive BannerMode where
+  | auto   -- Show if stderr is TTY
+  | always -- Always show
+  | never  -- Never show
+  deriving Repr, BEq, Inhabited
+
 /-- REPL configuration options. -/
 structure ReplConfig where
   color : ColorMode := .auto
+  banner : BannerMode := .auto
   pager : ColorMode := .auto  -- auto, always, never for pager
   outFormat : OutputFormat := .plain
   maxPreviewBytes : Nat := 256
@@ -166,10 +178,14 @@ structure ReplState where
   inMultiLine : Bool := false
   redactMode : Bool := false  -- :redact on/off
   sessionStackDepth : Nat := 0  -- Track depth instead of storing states
+  sourceDepth : Nat := 0  -- Track :source recursion depth
   deriving Repr, Inhabited
 
 /-- Maximum session stack depth. -/
 def maxSessionStackDepth : Nat := 10
+
+/-- Maximum :source recursion depth. -/
+def maxSourceDepth : Nat := 10
 
 /-- Maximum alias expansion depth. -/
 def maxAliasDepth : Nat := 16
@@ -253,6 +269,13 @@ def ReplOutput.both (out err : String) (code : ExitCode) : ReplOutput :=
 /-- Empty success output. -/
 def ReplOutput.empty : ReplOutput :=
   { out := "", err := "", code := .success, pipeValue := .text "" }
+
+/-- Append two ReplOutputs (concatenating stdout/stderr, keeping last code). -/
+def ReplOutput.append (a b : ReplOutput) : ReplOutput :=
+  { out := a.out ++ b.out
+  , err := a.err ++ b.err
+  , code := b.code
+  , pipeValue := b.pipeValue }
 
 /-- Get the type name of a variable value. -/
 def varTypeName : VarValue → String

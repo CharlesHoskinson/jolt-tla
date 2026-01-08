@@ -31,7 +31,39 @@ open CLI.Format
 /-- Default refresh interval in milliseconds. -/
 def defaultIntervalMs : Nat := 2000
 
-/-- Parse interval from command line argument. -/
+/-- Default iteration count. -/
+def defaultIterationCount : Nat := 30
+
+/-- Watch options. -/
+structure WatchOpts where
+  intervalMs : Nat := defaultIntervalMs
+  count : Nat := defaultIterationCount
+  quiet : Bool := false
+  deriving Repr
+
+/-- Parse watch options from command line arguments. -/
+def parseWatchOpts (args : List String) : WatchOpts := Id.run do
+  let mut opts : WatchOpts := {}
+
+  for arg in args do
+    if arg.startsWith "--interval=" then
+      if let some n := (arg.drop 11).toNat? then
+        opts := { opts with intervalMs := n * 1000 }  -- Convert seconds to ms
+    else if arg.startsWith "--count=" then
+      if let some n := (arg.drop 8).toNat? then
+        opts := { opts with count := n }
+    else if arg.startsWith "--max=" then  -- Backwards compatibility
+      if let some n := (arg.drop 6).toNat? then
+        opts := { opts with count := n }
+    else if arg == "--quiet" || arg == "-q" then
+      opts := { opts with quiet := true }
+    else if let some n := arg.toNat? then
+      -- Bare number = interval in seconds
+      opts := { opts with intervalMs := n * 1000 }
+
+  opts
+
+/-- Parse interval from command line argument (backwards compatibility). -/
 def parseInterval (arg : String) : Option Nat :=
   if arg.startsWith "--interval=" then
     let numStr := arg.drop 11
@@ -48,7 +80,8 @@ def getTimestamp : IO String := do
   pure "[refreshing...]"
 
 /-- Run a single watch iteration. -/
-def runWatchIteration (format : OutputFormat) (caps : Caps) (iteration : Nat) : IO String := do
+def runWatchIteration (format : OutputFormat) (caps : Caps) (iteration : Nat)
+    (maxIterations : Option Nat := none) : IO String := do
   let status := collectStatus
   let timestamp ← getTimestamp
 
@@ -64,17 +97,21 @@ def runWatchIteration (format : OutputFormat) (caps : Caps) (iteration : Nat) : 
     ] ++ "\n"
   | .pretty | .plain =>
     let icons := selectIcons caps
-    let doc := buildWatchDoc status icons iteration timestamp
+    let doc := buildWatchDoc status icons iteration maxIterations timestamp
     pure (clearScreen ++ renderPlain doc)
 
 where
-  buildWatchDoc (status : OracleStatus) (icons : IconSet) (iteration : Nat) (timestamp : String) : Doc :=
+  buildWatchDoc (status : OracleStatus) (icons : IconSet) (iteration : Nat)
+      (maxIterations : Option Nat) (timestamp : String) : Doc :=
+    let iterStr := match maxIterations with
+      | some max => s!"[{iteration + 1}/{max}]"
+      | none => s!"[{iteration + 1}]"
     Doc.vcat [
       Doc.headerBar "Jolt Oracle" (some "watch"),
       Doc.line,
       Doc.keyValue [
         Doc.kvStr "Mode" "Live Refresh",
-        Doc.kvStr "Iteration" (toString iteration),
+        Doc.kvStr "Iteration" iterStr,
         Doc.kvStr "Timestamp" timestamp
       ],
       Doc.line,
@@ -104,8 +141,8 @@ partial def watchLoop (iteration : Nat) (intervalMs : Nat) (format : OutputForma
       return 0
   | none => pure ()
 
-  -- Run iteration
-  let output ← runWatchIteration format caps iteration
+  -- Run iteration (pass maxIterations for display)
+  let output ← runWatchIteration format caps iteration maxIterations
   IO.print output
 
   -- Sleep
@@ -131,27 +168,14 @@ def runWatch (intervalMs : Nat) (format : OutputFormat := .pretty)
 
 /-- Main entry point for watch command. -/
 def watchMain (args : List String) : IO UInt32 := do
-  -- Parse arguments
-  let mut intervalMs := defaultIntervalMs
-  let mut maxIterations : Option Nat := none
+  -- Parse arguments with new WatchOpts structure
+  let opts := parseWatchOpts args
 
-  for arg in args do
-    if let some interval := parseInterval arg then
-      intervalMs := interval * 1000  -- Convert seconds to ms
-    else if arg.startsWith "--max=" then
-      let numStr := arg.drop 6
-      maxIterations := numStr.toNat?
+  -- Print initial message (unless quiet)
+  if !opts.quiet then
+    IO.eprintln s!"Starting watch mode (interval: {opts.intervalMs / 1000}s, count: {opts.count})"
+    IO.eprintln "Press Ctrl+C to exit\n"
 
-  -- Print initial message
-  IO.println s!"Starting watch mode (interval: {intervalMs / 1000}s)"
-  IO.println "Press Ctrl+C to exit\n"
-
-  -- For non-interactive testing, limit to 3 iterations by default if --max not specified
-  -- In real usage, this runs forever until Ctrl+C
-  let effectiveMax := match maxIterations with
-    | some n => some n
-    | none => some 3  -- Default to 3 for safety in non-interactive contexts
-
-  runWatch intervalMs .plain Caps.plain effectiveMax
+  runWatch opts.intervalMs .plain Caps.plain (some opts.count)
 
 end CLI.Commands
