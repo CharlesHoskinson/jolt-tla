@@ -19,7 +19,7 @@ env:
   # Pin exact TLA+ tools version for reproducibility
   # Release: https://github.com/tlaplus/tlaplus/releases/tag/v1.8.0
   TLAPLUS_VERSION: "1.8.0"
-  TLAPLUS_JAR_SHA256: "81755d4c181ce1ea3e234c5a4537594c3112d67114508b77feed017d4b2a71aa"
+  TLAPLUS_JAR_SHA256: "5ff9dcd6a1bcae6a62a0d654e39659c8a2e577fed90b3ef464d1752a48b2be5b"
   TLAPLUS_JAR_URL: "https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar"
 
 jobs:

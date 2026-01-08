@@ -238,7 +238,7 @@ curl -fsSL -o tla2tools.jar \
   https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar
 
 # Verify checksum (SHA256)
-# Expected: 81755d4c181ce1ea3e234c5a4537594c3112d67114508b77feed017d4b2a71aa
+# Expected: 5ff9dcd6a1bcae6a62a0d654e39659c8a2e577fed90b3ef464d1752a48b2be5b
 sha256sum tla2tools.jar
 ```
 
