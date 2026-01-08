@@ -19,6 +19,34 @@ ASSUME U64_TLC_BOUND <= FR_TLC_BOUND
 U64ToFr(u) == u
 
 (****************************************************************************)
+(* Status Enum: Matches Lean Jolt PublicInputs.Status                       *)
+(* Decision: Use enum {0,1,2} instead of raw exit_code (0-255)              *)
+(* This aligns TLA+ with the Lean oracle implementation.                    *)
+(****************************************************************************)
+
+\* Status values per Lean Jolt Wrapper/PublicInputs.lean
+STATUS_SUCCESS == 0   \* Execution completed successfully (exit_code = 0)
+STATUS_FAILURE == 1   \* Execution failed (exit_code > 0, any trap)
+STATUS_PENDING == 2   \* Execution not yet complete (intermediate state)
+
+Status == {STATUS_SUCCESS, STATUS_FAILURE, STATUS_PENDING}
+
+\* Convert exit_code to Status enum
+\* exit_code 0 -> Success, exit_code > 0 -> Failure
+ExitCodeToStatus(exit_code) ==
+    IF exit_code = 0 THEN STATUS_SUCCESS ELSE STATUS_FAILURE
+
+\* Convert Status to Fr for public inputs
+StatusToFr(status) == status  \* Identity since STATUS_* are already Fr-compatible
+
+\* Derive status from halted flag and exit_code
+\* Used when constructing public inputs from execution trace
+DeriveStatus(halted, exit_code) ==
+    IF halted = 0 THEN STATUS_PENDING
+    ELSE IF exit_code = 0 THEN STATUS_SUCCESS
+    ELSE STATUS_FAILURE
+
+(****************************************************************************)
 (* JOLT_WRAPPER_PROOF_SYSTEM_V1: Midnight-compatible proof system config    *)
 (* Section Reference: spec.md §5.2                                         *)
 (* These constants pin the proof system for byte-exact compatibility        *)
@@ -126,7 +154,9 @@ ConstructPublicInputs(input) ==
         newRootFr2 == Bytes32ToFr2(NewStateRoot(input.executionTrace))
         batchCommitFr2 == Bytes32ToFr2(input.publicOutputs.batch_commitment_bytes32)
         checkpointsFr == Bytes32ToFrLE(input.publicOutputs.checkpoints_digest_bytes32)
-        statusFr == U64ToFr(FinalExitStatus(input.executionTrace))
+        \* Use Status enum {0,1,2} instead of raw exit_code
+        finalState == TraceFinalState(input.executionTrace)
+        statusFr == StatusToFr(DeriveStatus(finalState.halted, finalState.exit_code))
         nonceFr == U64ToFr(input.batch_nonce_in)
     IN [program_hash_lo |-> progHashFr2.lo, program_hash_hi |-> progHashFr2.hi,
         old_root_lo |-> oldRootFr2.lo, old_root_hi |-> oldRootFr2.hi,
@@ -152,7 +182,12 @@ NewRootBinding(inputs, trace) == LET fr2 == Bytes32ToFr2(TraceFinalState(trace).
     IN /\ inputs.new_root_lo = fr2.lo /\ inputs.new_root_hi = fr2.hi
 
 \* Constraint 4: Status binding (CRITICAL for prefix-proof prevention)
-StatusFrBinding(inputs, trace) == inputs.status_fr = U64ToFr(TraceFinalState(trace).exit_code)
+\* Uses Status enum {0,1,2}: Success=0, Failure=1, Pending=2
+\* This matches Lean Jolt implementation
+StatusFrBinding(inputs, trace) ==
+    LET finalState == TraceFinalState(trace)
+        expectedStatus == DeriveStatus(finalState.halted, finalState.exit_code)
+    IN inputs.status_fr = StatusToFr(expectedStatus)
 
 \* Constraint 5: Halted binding
 HaltedBinding(trace) == TraceFinalState(trace).halted = 1

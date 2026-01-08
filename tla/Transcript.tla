@@ -33,18 +33,31 @@ CHALLENGE_UNSET == -1
 ChallengeValue == Fr \cup {CHALLENGE_UNSET}
 
 (****************************************************************************)
-(* Absorption Types (J.7.4-J.7.6)                                           *)
-(* Each absorption is tagged with its semantic type                         *)
+(* Transcript Type Tags (§8.4)                                              *)
+(* These are Fr discriminator values used for domain separation             *)
+(* Matches Lean Jolt/Transcript/Types.lean                                  *)
 (****************************************************************************)
 
-\* Absorption type tags for domain separation
+\* Per spec §8.4: type discriminators are Fr values, not strings
+TYPE_BYTES_FR == 1   \* For absorb_bytes operations
+TYPE_U64_FR == 2     \* For absorb_u64 operations
+TYPE_TAG_FR == 3     \* For absorb_tag operations
+TYPE_VEC_FR == 4     \* For absorb_vec operations
+
+TranscriptTypeTags == {TYPE_BYTES_FR, TYPE_U64_FR, TYPE_TAG_FR, TYPE_VEC_FR}
+
+(****************************************************************************)
+(* Absorption Types (semantic categorization)                               *)
+(* These classify what KIND of data is being absorbed                       *)
+(****************************************************************************)
+
+\* Absorption type tags for semantic separation
 \* Use TAG_TRANSCRIPT_VM_STATE from Hash.tla for proper domain alignment
 ABSORB_TYPE_VM_STATE == TAG_TRANSCRIPT_VM_STATE
 ABSORB_TYPE_COMMITMENT == "commitment"
 ABSORB_TYPE_CONFIG == "config"
 ABSORB_TYPE_PROGRAM_HASH == "program_hash"
 ABSORB_TYPE_NONCE == "nonce"
-
 ABSORB_TYPE_TAG == "tag"  \* For domain tag absorption (J.7)
 
 AbsorptionTypes == {
@@ -56,8 +69,9 @@ AbsorptionTypes == {
     ABSORB_TYPE_TAG
 }
 
-\* An absorption entry: type tag + value (Fr or Bytes32 encoded as Fr)
-AbsorptionEntry == [type: AbsorptionTypes, value: Fr]
+\* An absorption entry: semantic type + Fr type tag + value
+\* The fr_type_tag is what actually gets absorbed (per §8.4)
+AbsorptionEntry == [type: AbsorptionTypes, fr_type_tag: TranscriptTypeTags, value: Fr]
 
 (****************************************************************************)
 (* Transcript State                                                          *)
@@ -91,45 +105,62 @@ InitTranscript == [
 (* Transcript Operations                                                     *)
 (****************************************************************************)
 
-\* Absorb a typed value into the transcript
+\* Absorb a typed value into the transcript with Fr type discriminator
 \* Precondition: transcript is in absorbing phase
-TranscriptAbsorb(transcript, absorbType, value) ==
+\* Per §8.4: the fr_type_tag is absorbed as part of domain separation
+TranscriptAbsorb(transcript, absorbType, frTypeTag, value) ==
     IF transcript.phase # PHASE_ABSORBING
     THEN transcript  \* No-op if already squeezed (error in real impl)
     ELSE IF Len(transcript.absorptions) >= MAX_ABSORPTIONS
          THEN transcript  \* TLC bound reached
          ELSE [transcript EXCEPT
-             !.absorptions = Append(@, [type |-> absorbType, value |-> value])
+             !.absorptions = Append(@, [
+                 type |-> absorbType,
+                 fr_type_tag |-> frTypeTag,
+                 value |-> value
+             ])
          ]
 
+\* AbsorbU64: Absorb a u64 value (uses TYPE_U64_FR discriminator)
+\* Per §8.4: absorb_u64(x) = absorb_fr(TYPE_U64), absorb_fr(x)
+AbsorbU64(transcript, absorbType, u64Value) ==
+    TranscriptAbsorb(transcript, absorbType, TYPE_U64_FR, u64Value % FR_TLC_BOUND)
+
+\* AbsorbBytes: Absorb bytes (uses TYPE_BYTES_FR discriminator)
+\* Per §8.4: absorb_bytes(b) = absorb_fr(TYPE_BYTES), absorb_u64(len), absorb chunks
+\* Simplified for TLC: absorb as single Fr fingerprint
+AbsorbBytes(transcript, absorbType, bytesFingerprint) ==
+    TranscriptAbsorb(transcript, absorbType, TYPE_BYTES_FR, bytesFingerprint)
+
 \* Absorb a VM state digest (Fr) into transcript
+\* VMState digest is already Fr, so use TYPE_U64_FR (single element)
 AbsorbVMState(transcript, stateDigestFr) ==
-    TranscriptAbsorb(transcript, ABSORB_TYPE_VM_STATE, stateDigestFr)
+    TranscriptAbsorb(transcript, ABSORB_TYPE_VM_STATE, TYPE_U64_FR, stateDigestFr)
 
 \* Absorb a commitment (Fr) into transcript
 AbsorbCommitment(transcript, commitmentFr) ==
-    TranscriptAbsorb(transcript, ABSORB_TYPE_COMMITMENT, commitmentFr)
+    TranscriptAbsorb(transcript, ABSORB_TYPE_COMMITMENT, TYPE_U64_FR, commitmentFr)
 
 \* Absorb configuration digest into transcript
 AbsorbConfig(transcript, configDigestFr) ==
-    TranscriptAbsorb(transcript, ABSORB_TYPE_CONFIG, configDigestFr)
+    TranscriptAbsorb(transcript, ABSORB_TYPE_CONFIG, TYPE_U64_FR, configDigestFr)
 
-\* Absorb program hash (as Fr via encoding) into transcript
-AbsorbProgramHash(transcript, programHashFr) ==
-    TranscriptAbsorb(transcript, ABSORB_TYPE_PROGRAM_HASH, programHashFr)
+\* Absorb program hash (as bytes) into transcript
+\* Program hash is Bytes32, so use TYPE_BYTES_FR
+AbsorbProgramHash(transcript, programHashFingerprint) ==
+    TranscriptAbsorb(transcript, ABSORB_TYPE_PROGRAM_HASH, TYPE_BYTES_FR, programHashFingerprint)
 
-\* Absorb nonce (as Fr) into transcript
+\* Absorb nonce (as u64) into transcript
 AbsorbNonce(transcript, nonceFr) ==
-    TranscriptAbsorb(transcript, ABSORB_TYPE_NONCE, nonceFr)
+    TranscriptAbsorb(transcript, ABSORB_TYPE_NONCE, TYPE_U64_FR, nonceFr)
 
-\* AbsorbTag: Alias for domain-separated tag absorption
-\* J.7.4-J.7.6: absorb_tag(tag_string) hashes the tag for domain separation
+\* AbsorbTag: Domain-separated tag absorption (uses TYPE_TAG_FR)
+\* Per §8.6: absorb_tag validates format, then absorbs with TYPE_TAG discriminator
 \* This is used by StateDigestV1 algorithm (J.10.10.2 steps 2, 11, 13)
-\* For TLC model: we use TranscriptAbsorb with tag name as value
 AbsorbTag(transcript, tagString) ==
-    LET \* Convert tag string to Fr by using length as fingerprint
-        tagFr == Len(tagString)
-    IN TranscriptAbsorb(transcript, ABSORB_TYPE_TAG, tagFr)
+    LET \* Convert tag string to Fr fingerprint
+        tagFr == Len(tagString)  \* Simplified for TLC
+    IN TranscriptAbsorb(transcript, ABSORB_TYPE_TAG, TYPE_TAG_FR, tagFr)
 
 (****************************************************************************)
 (* Squeeze Operation                                                         *)
@@ -139,13 +170,16 @@ AbsorbTag(transcript, tagString) ==
 \* Serialize absorptions for hashing
 \* Creates a numeric encoding that preserves uniqueness
 \* Different absorption sequences MUST produce different values
+\* Per §8.4: fr_type_tag is part of the absorption, so include it in encoding
 RECURSIVE EncodeAbsorptions(_, _)
 EncodeAbsorptions(absorptions, idx) ==
     IF idx > Len(absorptions) THEN 0
     ELSE LET entry == absorptions[idx]
-             \* Each absorption: [type |-> String, value |-> Fr]
-             \* Use value directly (type is for domain separation in real impl)
-             entryVal == entry.value
+             \* Each absorption: [type |-> String, fr_type_tag |-> Fr, value |-> Fr]
+             \* Include fr_type_tag in encoding for proper domain separation
+             typeContrib == entry.fr_type_tag * 100
+             valueContrib == entry.value
+             entryVal == typeContrib + valueContrib
          IN entryVal * (1000 ^ idx) + EncodeAbsorptions(absorptions, idx + 1)
 
 SerializeAbsorptions(absorptions) ==
@@ -250,7 +284,8 @@ BuildTranscriptRec(entries, transcript) ==
     ELSE
         LET
             entry == Head(entries)
-            updated == TranscriptAbsorb(transcript, entry.type, entry.value)
+            \* Entry has: type, fr_type_tag, value
+            updated == TranscriptAbsorb(transcript, entry.type, entry.fr_type_tag, entry.value)
         IN
             BuildTranscriptRec(Tail(entries), updated)
 

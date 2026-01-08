@@ -16,39 +16,122 @@
 EXTENDS VMState
 
 (****************************************************************************)
-(* Registry Key Constants (J.2.3)                                           *)
+(* Registry Key Constants (§3.4)                                            *)
+(* All 17 required keys per Lean Jolt/Registry/ConfigTags.lean              *)
 (****************************************************************************)
 
-\* Required registry keys
-KEY_SPEC_VERSION == "JOLT_SPEC_VERSION"
-KEY_MAX_MANIFEST_BYTES == "JOLT_MAX_MANIFEST_BYTES"
-KEY_MAX_INTENTS == "JOLT_MAX_INTENTS"
-KEY_MAX_CHECKPOINTS_BYTES == "JOLT_MAX_CHECKPOINTS_BYTES"
-KEY_CONTEXT_BYTES32 == "JOLT_CONTEXT_BYTES32"
+\* Cryptographic configuration keys
+KEY_POSEIDON_FR == "JOLT_POSEIDON_FR_V1"
+KEY_PCS == "JOLT_PCS_V1"
+KEY_TRANSCRIPT_SCHEDULE == "JOLT_TRANSCRIPT_SCHEDULE_V1"
 
-\* Required keys for deployment readiness
+\* Guest VM configuration keys
+KEY_RISCV_PROFILE == "JOLT_RISCV_PROFILE_V1"
+KEY_RISCV_UNPRIV_SPEC == "JOLT_RISCV_UNPRIV_SPEC_V1"
+KEY_GUEST_MEMMAP == "JOLT_GUEST_MEMMAP_V1"
+KEY_TOOLCHAIN == "JOLT_TOOLCHAIN_V1"
+
+\* DoS caps configuration keys
+KEY_MAX_MANIFEST_BYTES == "JOLT_MAX_MANIFEST_BYTES_V1"
+KEY_MAX_INTENTS == "JOLT_MAX_INTENTS_V1"
+KEY_MAX_CHECKPOINTS_BYTES == "JOLT_MAX_CHECKPOINTS_BYTES_V1"
+
+\* Encoding configuration keys
+KEY_BATCH_MANIFEST_ENCODING == "JOLT_BATCH_MANIFEST_ENCODING_V1"
+KEY_BATCH_COMMITMENT == "JOLT_BATCH_COMMITMENT_V1"
+KEY_CHECKPOINTS_ENCODING == "JOLT_CHECKPOINTS_ENCODING_V1"
+
+\* Binding configuration keys
+KEY_CONTEXT_BYTES32 == "JOLT_CONTEXT_BYTES32_V1"
+
+\* Execution configuration keys
+KEY_CONTINUATIONS == "JOLT_CONTINUATIONS_V1"
+
+\* Identity configuration keys
+KEY_IMPL_COMMIT == "JOLT_IMPL_COMMIT_V1"
+KEY_WRAPPER_PROOF_SYSTEM == "JOLT_WRAPPER_PROOF_SYSTEM_V1"
+
+\* All 17 required keys for deployment readiness (§3.4)
 RequiredKeys == {
-    KEY_SPEC_VERSION,
+    KEY_POSEIDON_FR,
+    KEY_PCS,
+    KEY_TRANSCRIPT_SCHEDULE,
+    KEY_RISCV_PROFILE,
+    KEY_RISCV_UNPRIV_SPEC,
+    KEY_GUEST_MEMMAP,
+    KEY_TOOLCHAIN,
     KEY_MAX_MANIFEST_BYTES,
     KEY_MAX_INTENTS,
     KEY_MAX_CHECKPOINTS_BYTES,
-    KEY_CONTEXT_BYTES32
+    KEY_BATCH_MANIFEST_ENCODING,
+    KEY_BATCH_COMMITMENT,
+    KEY_CHECKPOINTS_ENCODING,
+    KEY_CONTEXT_BYTES32,
+    KEY_CONTINUATIONS,
+    KEY_IMPL_COMMIT,
+    KEY_WRAPPER_PROOF_SYSTEM
 }
+
+(****************************************************************************)
+(* External Handle Tags (§3.4)                                              *)
+(* These MUST NOT appear in registry.json - they are computed externally    *)
+(****************************************************************************)
+
+EXTERNAL_PARAMETER_REGISTRY_HASH == "JOLT_PARAMETER_REGISTRY_HASH_V1"
+EXTERNAL_WRAPPER_VK_HASH == "JOLT_WRAPPER_VK_HASH_V1"
+EXTERNAL_CONFORMANCE_BUNDLE_HASH == "JOLT_CONFORMANCE_BUNDLE_HASH_V1"
+
+ExternalHandleTags == {
+    EXTERNAL_PARAMETER_REGISTRY_HASH,
+    EXTERNAL_WRAPPER_VK_HASH,
+    EXTERNAL_CONFORMANCE_BUNDLE_HASH
+}
+
+(****************************************************************************)
+(* Registry Key Format Validation (§3.2)                                    *)
+(* Keys must match: ^JOLT_[A-Z0-9_]+_V[0-9]+$                               *)
+(****************************************************************************)
+
+\* Check if a string starts with "JOLT_"
+StartsWithJOLT(s) ==
+    /\ Len(s) >= 5
+    /\ SubSeq(s, 1, 5) = "JOLT_"
+
+\* Check if key matches the required format (simplified for TLC)
+\* Full regex: ^JOLT_[A-Z0-9_]+_V[0-9]+$
+IsValidKeyFormat(key) ==
+    /\ Len(key) >= 8  \* Minimum: "JOLT_X_V1"
+    /\ StartsWithJOLT(key)
+    \* Note: Full charset validation [A-Z0-9_] omitted for TLC tractability
+    \* Production implementations MUST validate the full format
 
 \* Sorted sequence of required keys (for deterministic config_tags order)
 \* Sort order: lexicographic on UTF-8 byte representation
 \* J.2.8: "config_tags MUST be ordered canonically"
 RequiredKeysSorted == <<
-    KEY_CONTEXT_BYTES32,           \* "JOLT_CONTEXT_BYTES32"
-    KEY_MAX_CHECKPOINTS_BYTES,     \* "JOLT_MAX_CHECKPOINTS_BYTES"
-    KEY_MAX_INTENTS,               \* "JOLT_MAX_INTENTS"
-    KEY_MAX_MANIFEST_BYTES,        \* "JOLT_MAX_MANIFEST_BYTES"
-    KEY_SPEC_VERSION               \* "JOLT_SPEC_VERSION"
+    KEY_BATCH_COMMITMENT,          \* "JOLT_BATCH_COMMITMENT_V1"
+    KEY_BATCH_MANIFEST_ENCODING,   \* "JOLT_BATCH_MANIFEST_ENCODING_V1"
+    KEY_CHECKPOINTS_ENCODING,      \* "JOLT_CHECKPOINTS_ENCODING_V1"
+    KEY_CONTEXT_BYTES32,           \* "JOLT_CONTEXT_BYTES32_V1"
+    KEY_CONTINUATIONS,             \* "JOLT_CONTINUATIONS_V1"
+    KEY_GUEST_MEMMAP,              \* "JOLT_GUEST_MEMMAP_V1"
+    KEY_IMPL_COMMIT,               \* "JOLT_IMPL_COMMIT_V1"
+    KEY_MAX_CHECKPOINTS_BYTES,     \* "JOLT_MAX_CHECKPOINTS_BYTES_V1"
+    KEY_MAX_INTENTS,               \* "JOLT_MAX_INTENTS_V1"
+    KEY_MAX_MANIFEST_BYTES,        \* "JOLT_MAX_MANIFEST_BYTES_V1"
+    KEY_PCS,                       \* "JOLT_PCS_V1"
+    KEY_POSEIDON_FR,               \* "JOLT_POSEIDON_FR_V1"
+    KEY_RISCV_PROFILE,             \* "JOLT_RISCV_PROFILE_V1"
+    KEY_RISCV_UNPRIV_SPEC,         \* "JOLT_RISCV_UNPRIV_SPEC_V1"
+    KEY_TOOLCHAIN,                 \* "JOLT_TOOLCHAIN_V1"
+    KEY_TRANSCRIPT_SCHEDULE,       \* "JOLT_TRANSCRIPT_SCHEDULE_V1"
+    KEY_WRAPPER_PROOF_SYSTEM       \* "JOLT_WRAPPER_PROOF_SYSTEM_V1"
 >>
 
 \* For TLC: verify that RequiredKeysSorted contains exactly RequiredKeys
 ASSUME {RequiredKeysSorted[i] : i \in 1..Len(RequiredKeysSorted)} = RequiredKeys
 ASSUME Len(RequiredKeysSorted) = Cardinality(RequiredKeys)
+ASSUME Cardinality(RequiredKeys) = 17  \* Exactly 17 required keys
 
 (****************************************************************************)
 (* Registry Entry Structure                                                  *)
@@ -162,26 +245,30 @@ ParseNat(s) ==
 ValidateRegistryValue(keyName, value) ==
     IF value = TBD_VALUE
     THEN FALSE  \* TBD is never valid
-    ELSE CASE keyName = KEY_SPEC_VERSION ->
-              \* Version must be non-empty string (semantic check: valid semver)
-              Len(value) > 0
-           [] keyName = KEY_MAX_MANIFEST_BYTES ->
-              \* Must be positive integer <= 2^20 (1 MiB reasonable bound)
-              LET n == ParseNat(value)
-              IN  n > 0 /\ n <= 1048576
-           [] keyName = KEY_MAX_INTENTS ->
-              \* Must be positive integer <= 256 (protocol bound)
-              LET n == ParseNat(value)
-              IN  n > 0 /\ n <= 256
-           [] keyName = KEY_MAX_CHECKPOINTS_BYTES ->
-              \* Must be positive integer <= 2^20
-              LET n == ParseNat(value)
-              IN  n > 0 /\ n <= 1048576
-           [] keyName = KEY_CONTEXT_BYTES32 ->
-              \* Context can be any non-empty string (32 bytes when decoded)
-              Len(value) > 0
-           [] OTHER ->
-              FALSE  \* Unknown key
+    ELSE CASE
+         \* DoS caps: must be positive integers within bounds
+         keyName = KEY_MAX_MANIFEST_BYTES ->
+              LET n == ParseNat(value) IN n > 0 /\ n <= 1048576
+         [] keyName = KEY_MAX_INTENTS ->
+              LET n == ParseNat(value) IN n > 0 /\ n <= 256
+         [] keyName = KEY_MAX_CHECKPOINTS_BYTES ->
+              LET n == ParseNat(value) IN n > 0 /\ n <= 1048576
+         \* String values: must be non-empty
+         [] keyName = KEY_POSEIDON_FR -> Len(value) > 0
+         [] keyName = KEY_PCS -> Len(value) > 0
+         [] keyName = KEY_TRANSCRIPT_SCHEDULE -> Len(value) > 0
+         [] keyName = KEY_RISCV_PROFILE -> Len(value) > 0
+         [] keyName = KEY_RISCV_UNPRIV_SPEC -> Len(value) > 0
+         [] keyName = KEY_GUEST_MEMMAP -> Len(value) > 0
+         [] keyName = KEY_TOOLCHAIN -> Len(value) > 0
+         [] keyName = KEY_BATCH_MANIFEST_ENCODING -> Len(value) > 0
+         [] keyName = KEY_BATCH_COMMITMENT -> Len(value) > 0
+         [] keyName = KEY_CHECKPOINTS_ENCODING -> Len(value) > 0
+         [] keyName = KEY_CONTEXT_BYTES32 -> Len(value) > 0
+         [] keyName = KEY_CONTINUATIONS -> Len(value) > 0
+         [] keyName = KEY_IMPL_COMMIT -> Len(value) > 0
+         [] keyName = KEY_WRAPPER_PROOF_SYSTEM -> Len(value) > 0
+         [] OTHER -> FALSE  \* Unknown key
 
 \* Validate entire registry
 ValidateRegistry(registry) ==
@@ -240,11 +327,22 @@ KeyConsistencyInvariant(registry) ==
 RequiredFlagInvariant(registry) ==
     \A k \in RequiredKeys : registry[k].required = TRUE
 
+\* No external handle tags in registry (§3.4)
+\* External handles are computed, not stored
+NoExternalHandlesInvariant(registry) ==
+    \A k \in DOMAIN registry : k \notin ExternalHandleTags
+
+\* All keys have valid format (§3.2)
+ValidKeyFormatInvariant(registry) ==
+    \A k \in DOMAIN registry : IsValidKeyFormat(k)
+
 \* Combined registry invariant
 RegistryInvariant(registry) ==
     /\ RegistryStateTypeOK(registry)
     /\ KeyConsistencyInvariant(registry)
     /\ RequiredFlagInvariant(registry)
+    /\ NoExternalHandlesInvariant(registry)
+    /\ ValidKeyFormatInvariant(registry)
 
 (****************************************************************************)
 (* Config Tags Determinism                                                   *)
