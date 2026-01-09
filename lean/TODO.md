@@ -77,11 +77,11 @@
 
 ## P2 — Nice to Have
 
-### 6. Tag Validation Decision
-- [ ] Resolve interpretation of §8.6:
-  - Strict: Tags must match `^[A-Z][A-Z0-9_]*(/V[0-9]+)?$`
-  - Current: `/V` suffix not enforced for transcript tags
-- [ ] Document decision in `Transcript/TagValidation.lean`
+### 6. Tag Validation Decision ✅
+- [x] Resolve interpretation of §8.6:
+  - Decision: `/V` suffix NOT required for transcript tags (documented in D001)
+  - Registry keys DO require version suffix per §3.3
+- [x] Document decision in `docs/decisions.md`
 
 ### 7. TLA+ Cross-Validation
 - [ ] Generate execution traces from TLA+ model
@@ -94,11 +94,11 @@
 - [ ] Benchmark full StateDigestV1 computation
 - [ ] Consider `@[extern]` for hot paths if needed
 
-### 9. Documentation
-- [ ] CLI usage examples in README
-- [ ] Error code reference table
-- [ ] Architecture diagram
-- [ ] Decision log for spec interpretations
+### 9. Documentation ✅
+- [x] CLI usage examples in README
+- [x] Error code reference table (complete reference in README)
+- [x] Architecture diagram (component + data flow diagrams)
+- [x] Decision log for spec interpretations (`docs/decisions.md`)
 
 ### 10. NEEDS_EVIDENCE Items
 - [ ] `Wrapper/ProofSystem.lean:115` - hashSHA256 (wrapper VK hash)
