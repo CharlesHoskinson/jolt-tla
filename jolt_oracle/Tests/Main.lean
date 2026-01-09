@@ -1,5 +1,7 @@
 import Jolt.Oracle
 import Jolt.Poseidon.Constants
+import Jolt.Hash.SHA256
+import Jolt.Registry.Hash
 import Tests.JSONParserTests
 import Tests.CLITerminalTests
 import Tests.REPLTests
@@ -12,6 +14,7 @@ Test suite for the Jolt Oracle.
 
 open Jolt
 open Jolt.Poseidon.Constants
+open Jolt.Hash
 
 /-- Test Fr arithmetic. -/
 def testFrArithmetic : IO Bool := do
@@ -272,6 +275,36 @@ def testPoseidonConfig : IO Bool := do
   IO.println "PASS: Poseidon config"
   return true
 
+/-- Test SHA-256 hash function against NIST test vectors. -/
+def testSHA256 : IO Bool := do
+  -- NIST test vector: empty string
+  -- SHA256("") = e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  let emptyHash := sha256Hex ByteArray.empty
+  let expectedEmpty := "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  if emptyHash != expectedEmpty then
+    IO.println s!"FAIL: SHA256(\"\") = {emptyHash}, expected {expectedEmpty}"
+    return false
+
+  -- NIST test vector: "abc"
+  -- SHA256("abc") = ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad
+  let abcHash := sha256Hex "abc".toUTF8
+  let expectedAbc := "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+  if abcHash != expectedAbc then
+    IO.println s!"FAIL: SHA256(\"abc\") = {abcHash}, expected {expectedAbc}"
+    return false
+
+  -- NIST test vector: 448-bit message (exactly one block after padding)
+  -- "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"
+  let longMsg := "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"
+  let longHash := sha256Hex longMsg.toUTF8
+  let expectedLong := "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1"
+  if longHash != expectedLong then
+    IO.println s!"FAIL: SHA256(448-bit) = {longHash}, expected {expectedLong}"
+    return false
+
+  IO.println "PASS: SHA-256"
+  return true
+
 /-- Test Fr hex encoding/decoding roundtrip. -/
 def testFrHexRoundtrip : IO Bool := do
   -- Test roundtrip with known value
@@ -325,6 +358,11 @@ def runTests : IO UInt32 := do
   if ← testPoseidonMDS then passed := passed + 1 else failed := failed + 1
   if ← testPoseidonRoundConstants then passed := passed + 1 else failed := failed + 1
   if ← testPoseidonConfig then passed := passed + 1 else failed := failed + 1
+
+  IO.println ""
+  IO.println "=== SHA-256 Tests ==="
+  IO.println ""
+  if ← testSHA256 then passed := passed + 1 else failed := failed + 1
 
   IO.println ""
 

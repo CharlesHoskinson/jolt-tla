@@ -11,8 +11,10 @@ import Jolt.Wrapper.PublicInputs
 import Jolt.Wrapper.ProofSystem
 import Jolt.Registry.Validate
 import Jolt.Registry.ConfigTags
+import Jolt.Registry.Hash
 import Jolt.Bundle.Tar
 import Jolt.JSON.Parser
+import Jolt.Hash.SHA256
 
 namespace Jolt
 
