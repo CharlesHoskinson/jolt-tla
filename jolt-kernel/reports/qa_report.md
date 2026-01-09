@@ -184,5 +184,4 @@ Both axioms are **cryptographic security assumptions** - they cannot be proven m
 
 ---
 
-*Last updated*
-*Axiom remediation completed: 2026-01-06*
+*Last updated: 2026-01-06*
