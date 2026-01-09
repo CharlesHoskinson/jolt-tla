@@ -127,12 +127,25 @@ StateConstraint ==
 ModelBytes32 == [i \in 0..31 |-> 0]
 
 ModelValueForKey(keyName) ==
-    CASE keyName = KEY_SPEC_VERSION -> "1.0.0"
+    \* Provide valid values for all 17 required keys
+    CASE keyName = KEY_POSEIDON_FR -> "JOLT_POSEIDON_FR_V1"
+      [] keyName = KEY_PCS -> "JOLT_PCS_V1"
+      [] keyName = KEY_TRANSCRIPT_SCHEDULE -> "standard"
+      [] keyName = KEY_RISCV_PROFILE -> "RV32IM"
+      [] keyName = KEY_RISCV_UNPRIV_SPEC -> "20191213"
+      [] keyName = KEY_GUEST_MEMMAP -> "standard"
+      [] keyName = KEY_TOOLCHAIN -> "rustc-1.75"
       [] keyName = KEY_MAX_MANIFEST_BYTES -> "512"
       [] keyName = KEY_MAX_INTENTS -> "8"
       [] keyName = KEY_MAX_CHECKPOINTS_BYTES -> "256"
+      [] keyName = KEY_BATCH_MANIFEST_ENCODING -> "cbor"
+      [] keyName = KEY_BATCH_COMMITMENT -> "sha256"
+      [] keyName = KEY_CHECKPOINTS_ENCODING -> "cbor"
       [] keyName = KEY_CONTEXT_BYTES32 -> "CONTEXT1"
-      [] OTHER -> "1.0.0"
+      [] keyName = KEY_CONTINUATIONS -> "enabled"
+      [] keyName = KEY_IMPL_COMMIT -> "abc123"
+      [] keyName = KEY_WRAPPER_PROOF_SYSTEM -> "halo2-kzg"
+      [] OTHER -> "default"
 
 ModelRegistryEntry(keyName) ==
     [key |-> keyName,

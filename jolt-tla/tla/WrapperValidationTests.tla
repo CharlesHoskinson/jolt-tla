@@ -8,7 +8,7 @@
 ---- MODULE WrapperValidationTests ----
 (****************************************************************************)
 (* TLC Test Cases for JOLT_WRAPPER_PROOF_SYSTEM_V1 Validation               *)
-(* Section Reference: CLAUDE_UPDATE_PLAN_JOLT_WRAPPER_PROOF_SYSTEM_V1 §4.4  *)
+(* Section Reference: spec.md §5.2 - Wrapper proof system validation       *)
 (* Purpose: Verify fail-closed validation logic for wrapper payloads        *)
 (*                                                                          *)
 (* This is a STANDALONE test module that does not depend on the full        *)

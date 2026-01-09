@@ -24,14 +24,6 @@ OUTPUT_PTR == IO_REGION_BASE + (2 * PAGE_SIZE_BYTES)
 STACK_PTR == RW_REGION_BASE + RW_REGION_SIZE
 
 (****************************************************************************)
-(* Domain Tags (transformed from NF/ to JOLT/)                               *)
-(****************************************************************************)
-
-TAG_BATCH_COMMITMENT == "JOLT/BATCH/COMMIT/V1"
-TAG_CHECKPOINTS_DIGEST == "JOLT/CHECKPOINTS/DIGEST/V1"
-TAG_IO_INIT == "JOLT/IO/INIT/V1"
-
-(****************************************************************************)
 (* Batch and Checkpoint Digest Computation                                   *)
 (****************************************************************************)
 

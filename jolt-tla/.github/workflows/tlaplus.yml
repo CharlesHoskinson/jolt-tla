@@ -1,0 +1,226 @@
+name: TLA+ Verification
+
+on:
+  push:
+    branches: [master, main]
+    paths:
+      - '**.tla'
+      - '**.cfg'
+      - '.github/workflows/tlaplus.yml'
+  pull_request:
+    branches: [master, main]
+    paths:
+      - '**.tla'
+      - '**.cfg'
+      - '.github/workflows/tlaplus.yml'
+  workflow_dispatch:
+
+env:
+  # Pin exact TLA+ tools version for reproducibility
+  # Release: https://github.com/tlaplus/tlaplus/releases/tag/v1.8.0
+  TLAPLUS_VERSION: "1.8.0"
+  TLAPLUS_JAR_SHA256: "5ff9dcd6a1bcae6a62a0d654e39659c8a2e577fed90b3ef464d1752a48b2be5b"
+  TLAPLUS_JAR_URL: "https://github.com/tlaplus/tlaplus/releases/download/v1.8.0/tla2tools.jar"
+
+jobs:
+  verify:
+    name: Parse & Model Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Download TLA+ tools
+        run: |
+          echo "Downloading tla2tools.jar v$TLAPLUS_VERSION..."
+          curl -fsSL -o tla2tools.jar "$TLAPLUS_JAR_URL"
+
+          echo "Verifying checksum..."
+          ACTUAL_SHA256=$(sha256sum tla2tools.jar | cut -d' ' -f1)
+          echo "Expected: $TLAPLUS_JAR_SHA256"
+          echo "Actual:   $ACTUAL_SHA256"
+
+          if [ "$ACTUAL_SHA256" != "$TLAPLUS_JAR_SHA256" ]; then
+            echo "ERROR: Checksum mismatch!"
+            exit 1
+          fi
+          echo "Checksum verified."
+
+      - name: Parse modular specification (SANY)
+        run: |
+          echo "=== SANY Parse Check (Modular Harness) ===" | tee -a tlaplus-output.log
+          echo "Canonical entrypoint: tla/MC_Jolt.tla" | tee -a tlaplus-output.log
+          java -cp tla2tools.jar tla2sany.SANY tla/MC_Jolt.tla 2>&1 | tee -a tlaplus-output.log
+          echo "" >> tlaplus-output.log
+
+      - name: Model check modular spec (TLC)
+        run: |
+          echo "=== TLC Model Check (Modular) ===" | tee -a tlaplus-output.log
+          echo "Specification: tla/MC_Jolt.tla" | tee -a tlaplus-output.log
+          echo "Configuration: Jolt.cfg" | tee -a tlaplus-output.log
+          echo "" | tee -a tlaplus-output.log
+
+          java -XX:+UseParallelGC -Xmx4g \
+            -jar tla2tools.jar \
+            -config Jolt.cfg \
+            -workers auto \
+            -deadlock \
+            tla/MC_Jolt.tla 2>&1 | tee -a tlaplus-output.log
+
+          TLC_EXIT=$?
+          echo "" >> tlaplus-output.log
+          echo "TLC exit code: $TLC_EXIT" | tee -a tlaplus-output.log
+
+          if [ $TLC_EXIT -ne 0 ]; then
+            echo "ERROR: TLC found errors"
+            exit 1
+          fi
+
+      - name: Extract verification summary
+        if: always()
+        run: |
+          echo "=== Verification Summary ===" | tee -a tlaplus-output.log
+          echo "" | tee -a tlaplus-output.log
+          echo "TLA+ Tools Version: $TLAPLUS_VERSION" | tee -a tlaplus-output.log
+          echo "Canonical Specification: tla/MC_Jolt.tla" | tee -a tlaplus-output.log
+          echo "Configuration: Jolt.cfg" | tee -a tlaplus-output.log
+          echo "" | tee -a tlaplus-output.log
+
+          # Extract invariants checked
+          echo "Invariants checked:" | tee -a tlaplus-output.log
+          grep -E "INVARIANT|Invariant" Jolt.cfg | tee -a tlaplus-output.log || true
+          echo "" | tee -a tlaplus-output.log
+
+          # Show state space explored
+          grep -E "states generated|distinct states|states left" tlaplus-output.log || true
+
+      - name: Upload TLC output
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: tlaplus-verification-output
+          path: tlaplus-output.log
+          retention-days: 90
+
+  negative-tests:
+    name: Non-Vacuity Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Download TLA+ tools
+        run: |
+          curl -fsSL -o tla2tools.jar "$TLAPLUS_JAR_URL"
+          ACTUAL_SHA256=$(sha256sum tla2tools.jar | cut -d' ' -f1)
+          if [ "$ACTUAL_SHA256" != "$TLAPLUS_JAR_SHA256" ]; then
+            echo "ERROR: Checksum mismatch!"
+            exit 1
+          fi
+
+      - name: Parse negative test modules (SANY)
+        run: |
+          echo "=== Parsing negative test modules ===" | tee -a negative-tests.log
+          java -cp tla2tools.jar tla2sany.SANY tla/MC_BadChain_Splice.tla 2>&1 | tee -a negative-tests.log
+          java -cp tla2tools.jar tla2sany.SANY tla/MC_BadChain_Skip.tla 2>&1 | tee -a negative-tests.log
+          java -cp tla2tools.jar tla2sany.SANY tla/MC_BadRegistry_ExternalHandle.tla 2>&1 | tee -a negative-tests.log
+          java -cp tla2tools.jar tla2sany.SANY tla/MC_BadTranscript_TypeConfusion.tla 2>&1 | tee -a negative-tests.log
+
+      - name: "Non-vacuity: MC_BadChain_Splice (expect failure)"
+        run: |
+          echo "=== MC_BadChain_Splice: Testing INV_ATK_NoSplice ===" | tee -a negative-tests.log
+          echo "Expected: TLC should find invariant violation" | tee -a negative-tests.log
+
+          # Run TLC and capture exit code (expect non-zero for invariant violation)
+          TLC_EXIT=0
+          java -XX:+UseParallelGC -Xmx2g \
+            -jar tla2tools.jar \
+            -config BadChain_Splice.cfg \
+            -workers auto \
+            tla/MC_BadChain_Splice.tla 2>&1 >> negative-tests.log || TLC_EXIT=$?
+
+          if [ $TLC_EXIT -eq 0 ]; then
+            echo "FAIL: TLC should have found invariant violation but succeeded"
+            exit 1
+          fi
+          echo "PASS: TLC correctly detected invariant violation (exit code $TLC_EXIT)"
+
+      - name: "Non-vacuity: MC_BadChain_Skip (expect failure)"
+        run: |
+          echo "=== MC_BadChain_Skip: Testing INV_ATK_NoSkipChunk ===" | tee -a negative-tests.log
+          echo "Expected: TLC should find invariant violation" | tee -a negative-tests.log
+
+          # Run TLC and capture exit code (expect non-zero for invariant violation)
+          TLC_EXIT=0
+          java -XX:+UseParallelGC -Xmx2g \
+            -jar tla2tools.jar \
+            -config BadChain_Skip.cfg \
+            -workers auto \
+            tla/MC_BadChain_Skip.tla 2>&1 >> negative-tests.log || TLC_EXIT=$?
+
+          if [ $TLC_EXIT -eq 0 ]; then
+            echo "FAIL: TLC should have found invariant violation but succeeded"
+            exit 1
+          fi
+          echo "PASS: TLC correctly detected invariant violation (exit code $TLC_EXIT)"
+
+      - name: "Pattern A: MC_BadRegistry_ExternalHandle (expect success)"
+        run: |
+          echo "=== MC_BadRegistry_ExternalHandle: External handles blocked ===" | tee -a negative-tests.log
+          echo "Expected: TLC should succeed (external handles prevented by type system)" | tee -a negative-tests.log
+
+          # Run TLC and capture exit code (expect 0 for success)
+          # Use -deadlock flag since we expect termination, not progress
+          TLC_EXIT=0
+          java -XX:+UseParallelGC -Xmx2g \
+            -jar tla2tools.jar \
+            -config BadRegistry_ExternalHandle.cfg \
+            -workers auto \
+            -deadlock \
+            tla/MC_BadRegistry_ExternalHandle.tla 2>&1 >> negative-tests.log || TLC_EXIT=$?
+
+          if [ $TLC_EXIT -ne 0 ]; then
+            echo "FAIL: Invariant should hold (external handles blocked), TLC exited $TLC_EXIT"
+            exit 1
+          fi
+          echo "PASS: External handles correctly blocked by type system"
+
+      - name: Upload negative test output
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: negative-tests-output
+          path: negative-tests.log
+          retention-days: 90
+
+  alignment-check:
+    name: Constants Alignment
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Run alignment check
+        run: |
+          echo "=== Constants Alignment Check ==="
+          python3 scripts/check_alignment.py

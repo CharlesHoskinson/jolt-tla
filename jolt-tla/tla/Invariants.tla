@@ -57,8 +57,12 @@ INV_TYPE_All ==
 (****************************************************************************)
 
 INV_BIND_StatusFr ==
+    \* Uses Status enum {0,1,2}: Success=0, Failure=1, Pending=2
+    \* This matches Lean Jolt implementation (not raw exit_code 0-255)
     sys.phase = PHASE_COMPLETE =>
-        sys.publicInputs.status_fr = U64ToFr(FinalExitStatus(sys.continuation.chunks))
+        LET finalState == TraceFinalState(sys.continuation.chunks)
+            expectedStatus == DeriveStatus(finalState.halted, finalState.exit_code)
+        IN sys.publicInputs.status_fr = StatusToFr(expectedStatus)
 
 INV_BIND_OldRoot ==
     sys.phase = PHASE_COMPLETE =>
@@ -145,14 +149,15 @@ INV_SAFE_All ==
 
 \* INV_ATK_NoPrefixProof: Prevents accepting incomplete execution
 \* Attack: Prover proves first half of execution, skips critical logic
+\* Uses Status enum: STATUS_SUCCESS=0, STATUS_FAILURE=1
 INV_ATK_NoPrefixProof ==
     sys.phase = PHASE_COMPLETE =>
         LET finalState == TraceFinalState(sys.continuation.chunks)
-        IN /\ (sys.publicInputs.status_fr = U64ToFr(JOLT_STATUS_OK) =>
+        IN /\ (sys.publicInputs.status_fr = STATUS_SUCCESS =>
                   /\ IsSuccessfulHalt(finalState)
                   /\ finalState.halted = 1)
            /\ (IsSuccessfulHalt(finalState) /\ finalState.halted = 1 =>
-                  sys.publicInputs.status_fr = U64ToFr(JOLT_STATUS_OK))
+                  sys.publicInputs.status_fr = STATUS_SUCCESS)
 
 \* INV_ATK_NoSkipChunk: Prevents skipping chunks in sequence
 \* Attack: Prover omits chunk containing critical logic

@@ -11,9 +11,9 @@
 (* Appendix J Reference: J.7 (Poseidon transcript), J.10.8.3 (SMT hash),    *)
 (*                       J.4.7 (SHA-256 batch commitment)                   *)
 (* Version: 1.0                                                             *)
-(* Notes: Contains all 12 domain tags for Fiat-Shamir separation.           *)
+(* Notes: Contains all 17 domain tags for Fiat-Shamir separation.           *)
 (****************************************************************************)
-EXTENDS Types, Encodings, FiniteSets
+EXTENDS Types, Encodings, FiniteSets, Sequences
 
 (****************************************************************************)
 (* CONSTANTS                                                                 *)
@@ -102,9 +102,19 @@ ASSUME TAG_STRINGS # {}
 \*     \A x : PoseidonHashBytes(tag1, x) # PoseidonHashBytes(tag2, x)
 
 (****************************************************************************)
-(* Domain Tags (J.7.7, J.10.8.3, J.4.7)                                     *)
-(* These are the actual ASCII tags used in Appendix J                       *)
+(* Domain Tags (§8.6, J.7.7, J.10.8.3, J.4.7)                               *)
+(* ALL domain tags are centralized here - other modules import, don't define*)
+(* Tags must match charset [A-Z0-9/_] and start with "JOLT/"               *)
 (****************************************************************************)
+
+\* Tag format validation per §8.6
+\* Tags must: start with "JOLT/", use charset [A-Z0-9/_], be ASCII only
+IsValidTagFormat(tag) ==
+    /\ tag # ""
+    /\ Len(tag) >= 5
+    /\ SubSeq(tag, 1, 5) = "JOLT/"
+    \* Note: Full charset validation omitted for TLC tractability
+    \* Production implementations MUST validate [A-Z0-9/_] charset
 
 \* SMT tags (J.10.8.3)
 TAG_SMT_PAGE == "JOLT/SMT/PAGE/V1"
@@ -121,12 +131,14 @@ TAG_BATCH_FILL_LEAF == "JOLT/BATCH/FILL_LEAF/V1"
 TAG_BATCH_EMPTY_FILL_LEAF == "JOLT/BATCH/EMPTY_FILL_LEAF/V1"
 TAG_BATCH_PAD_LEAF == "JOLT/BATCH/PAD_LEAF/V1"
 TAG_BATCH_NODE == "JOLT/BATCH/NODE/V1"
+TAG_BATCH_COMMITMENT == "JOLT/BATCH/COMMIT/V1"  \* Batch commitment hash
 
 \* StateDigest tag (J.10.10) - domain separator for state digests
 TAG_STATE_DIGEST == "JOLT/STATE/V1"
 
-\* Checkpoints tag (J.4.8)
+\* Checkpoints tags (J.4.8)
 TAG_CHECKPOINTS == "JOLT/CHECKPOINTS/V1"
+TAG_CHECKPOINTS_DIGEST == "JOLT/CHECKPOINTS/DIGEST/V1"
 
 \* Config tags domain separator (J.10.10.2 step 11)
 \* Used when absorbing config_tags in StateDigestV1 algorithm
@@ -136,24 +148,41 @@ TAG_CONFIG_TAGS == "JOLT/CONFIG_TAGS/V1"
 \* Used for each (tag_name, tag_value) pair in config_tags
 TAG_TAG == "JOLT/TAG/V1"
 
-\* All domain tags defined in this module.
-ALL_DOMAIN_TAGS ==
-    { TAG_SMT_PAGE,
-      TAG_SMT_NODE,
-      TAG_TRANSCRIPT_VM_STATE,
-      TAG_TRANSCRIPT_CHALLENGE,
-      TAG_TRANSCRIPT_DOMAIN,
-      TAG_BATCH_HEADER_LEAF,
-      TAG_BATCH_FILL_LEAF,
-      TAG_BATCH_EMPTY_FILL_LEAF,
-      TAG_BATCH_PAD_LEAF,
-      TAG_BATCH_NODE,
-      TAG_STATE_DIGEST,
-      TAG_CHECKPOINTS,
-      TAG_CONFIG_TAGS,
-      TAG_TAG }
+\* IO initialization tag
+TAG_IO_INIT == "JOLT/IO/INIT/V1"
 
+\* All domain tags defined in this module (17 total).
+\* ALL other modules MUST import tags from here, not define their own.
+ALL_DOMAIN_TAGS == {
+    \* SMT tags
+    TAG_SMT_PAGE,
+    TAG_SMT_NODE,
+    \* Transcript tags
+    TAG_TRANSCRIPT_VM_STATE,
+    TAG_TRANSCRIPT_CHALLENGE,
+    TAG_TRANSCRIPT_DOMAIN,
+    \* Batch commitment tags
+    TAG_BATCH_HEADER_LEAF,
+    TAG_BATCH_FILL_LEAF,
+    TAG_BATCH_EMPTY_FILL_LEAF,
+    TAG_BATCH_PAD_LEAF,
+    TAG_BATCH_NODE,
+    TAG_BATCH_COMMITMENT,
+    \* State and config tags
+    TAG_STATE_DIGEST,
+    TAG_CONFIG_TAGS,
+    TAG_TAG,
+    \* Checkpoints tags
+    TAG_CHECKPOINTS,
+    TAG_CHECKPOINTS_DIGEST,
+    \* IO tag
+    TAG_IO_INIT
+}
+
+\* Verify all domain tags are valid format
+ASSUME \A t \in ALL_DOMAIN_TAGS : IsValidTagFormat(t)
 ASSUME ALL_DOMAIN_TAGS \subseteq TAG_STRINGS
+ASSUME Cardinality(ALL_DOMAIN_TAGS) = 17  \* Exactly 17 domain tags
 
 (****************************************************************************)
 (* Poseidon Hash Operators (J.7.7)                                          *)

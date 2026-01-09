@@ -22,7 +22,7 @@ lean_lib CLI where
              `CLI.REPL.Parser, `CLI.REPL.Eval, `CLI.REPL.Loop]
 
 lean_lib Tests where
-  roots := #[`Tests.Main, `Tests.JSONParserTests, `Tests.CLITerminalTests]
+  roots := #[`Tests.Main, `Tests.JSONParserTests, `Tests.CLITerminalTests, `Tests.REPLTests]
 
 lean_exe oracle where
   root := `CLI.Main
