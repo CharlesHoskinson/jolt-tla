@@ -23,3 +23,8 @@ Thumbs.db
 # Temporary
 *.tmp
 *.bak
+
+# Nix
+result
+result-*
+.direnv/
