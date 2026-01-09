@@ -186,13 +186,14 @@ where
     | .E601_CommitmentMismatch => "Commitment mismatch"
     | .E602_TranscriptMismatch => "Transcript mismatch"
     | .E700_NonCanonicalTar => "Non-canonical tar archive"
-    | .E701_InvalidTarHeader => "Invalid tar header"
+    | .E701_InvalidTarHeader r => s!"Invalid tar header: {r}"
     | .E702_UnsortedMembers => "Tar members must be bytewise sorted"
     | .E703_NonZeroMtime => "Tar mtime must be zero"
     | .E704_InvalidPath r => s!"Invalid path: {r}"
     | .E705_DuplicateMember => "Duplicate tar member"
     | .E706_InvalidMemberType => "Invalid tar member type"
     | .E707_PAXExtensionPresent => "PAX extension headers not allowed"
+    | .E708_MissingRegistryJson => "Bundle missing registry.json"
 
 /-- Get error code string (e.g., "E404_InvalidHalted"). -/
 def ErrorReport.codeString (e : ErrorReport) : String :=
@@ -240,13 +241,14 @@ def ErrorReport.codeString (e : ErrorReport) : String :=
   | .E601_CommitmentMismatch => "E601_CommitmentMismatch"
   | .E602_TranscriptMismatch => "E602_TranscriptMismatch"
   | .E700_NonCanonicalTar => "E700_NonCanonicalTar"
-  | .E701_InvalidTarHeader => "E701_InvalidTarHeader"
+  | .E701_InvalidTarHeader _ => "E701_InvalidTarHeader"
   | .E702_UnsortedMembers => "E702_UnsortedMembers"
   | .E703_NonZeroMtime => "E703_NonZeroMtime"
   | .E704_InvalidPath _ => "E704_InvalidPath"
   | .E705_DuplicateMember => "E705_DuplicateMember"
   | .E706_InvalidMemberType => "E706_InvalidMemberType"
   | .E707_PAXExtensionPresent => "E707_PAXExtensionPresent"
+  | .E708_MissingRegistryJson => "E708_MissingRegistryJson"
 
 /-- Map error code to exit code. -/
 def exitCodeForError (code : ErrorCode) : ExitCode :=
@@ -278,9 +280,10 @@ def exitCodeForError (code : ErrorCode) : ExitCode :=
   | .E600_HashMismatch _ | .E601_CommitmentMismatch
   | .E602_TranscriptMismatch => .unhealthy
   -- Tar errors → INVALID
-  | .E700_NonCanonicalTar | .E701_InvalidTarHeader
+  | .E700_NonCanonicalTar | .E701_InvalidTarHeader _
   | .E702_UnsortedMembers | .E703_NonZeroMtime
   | .E704_InvalidPath _ | .E705_DuplicateMember
-  | .E706_InvalidMemberType | .E707_PAXExtensionPresent => .invalid
+  | .E706_InvalidMemberType | .E707_PAXExtensionPresent
+  | .E708_MissingRegistryJson => .invalid
 
 end CLI.Report

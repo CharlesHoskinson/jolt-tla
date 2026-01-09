@@ -234,4 +234,120 @@ def createCanonicalTar (members : Array TarMember) : OracleResult ByteArray := d
 
   pure archive
 
+/-! ## TAR Parsing -/
+
+/-- Parse octal number from bytes (with NUL/space termination). -/
+def parseOctal (data : ByteArray) (offset : Nat) (width : Nat) : Nat := Id.run do
+  let mut result : Nat := 0
+  for i in [:width] do
+    if offset + i >= data.size then break
+    let b := data.data[offset + i]!.toNat
+    -- Stop at NUL or space
+    if b == 0 || b == 0x20 then break
+    -- Must be ASCII digit '0'-'7'
+    if b < 0x30 || b > 0x37 then break
+    result := result * 8 + (b - 0x30)
+  return result
+
+/-- Extract NUL-terminated string from bytes. -/
+def extractString (data : ByteArray) (offset : Nat) (maxLen : Nat) : String := Id.run do
+  let mut chars : List Char := []
+  for i in [:maxLen] do
+    if offset + i >= data.size then break
+    let b := data.data[offset + i]!
+    if b == 0 then break
+    chars := chars ++ [Char.ofNat b.toNat]
+  return String.ofList chars
+
+/-- Check if a header block is all zeros (end-of-archive marker). -/
+def isZeroBlock (data : ByteArray) (offset : Nat) : Bool := Id.run do
+  if offset + HEADER_SIZE > data.size then return true
+  for i in [:HEADER_SIZE] do
+    if data.data[offset + i]! != 0 then return false
+  return true
+
+/-- Parse a single TAR header at given offset. Returns (member, next_offset). -/
+def parseHeader (data : ByteArray) (offset : Nat) : OracleResult (TarMember × Nat) := do
+  if offset + HEADER_SIZE > data.size then
+    throw (ErrorCode.E701_InvalidTarHeader "truncated header")
+
+  -- Extract header bytes
+  let header := data.extract offset (offset + HEADER_SIZE)
+
+  -- Check checksum
+  let storedChecksum := parseOctal header 148 8
+  let computedChecksum := computeChecksum header
+  if storedChecksum != computedChecksum then
+    throw (ErrorCode.E701_InvalidTarHeader "checksum mismatch")
+
+  -- Extract name (0-99)
+  let name := extractString header 0 100
+
+  -- Extract size (124-135)
+  let size := parseOctal header 124 12
+
+  -- Extract type (156)
+  let typeByte := header.data[156]!
+  let memberType := match typeByte.toNat with
+    | 0x30 | 0x00 => TarType.Regular  -- '0' or NUL
+    | 0x35 => TarType.Directory       -- '5'
+    | _ => TarType.Regular            -- Default to regular
+
+  -- Verify mtime is 0 (offset 136-147)
+  let mtime := parseOctal header 136 12
+  if mtime != 0 then
+    throw (ErrorCode.E703_NonZeroMtime)
+
+  -- Calculate content start and next offset
+  let contentStart := offset + HEADER_SIZE
+  let contentEnd := contentStart + size
+  let paddedSize := if size > 0 then ((size + BLOCK_SIZE - 1) / BLOCK_SIZE) * BLOCK_SIZE else 0
+  let nextOffset := contentStart + paddedSize
+
+  if contentEnd > data.size then
+    throw (ErrorCode.E701_InvalidTarHeader "truncated content")
+
+  -- Extract content
+  let content := if memberType == .Regular && size > 0
+    then data.extract contentStart contentEnd
+    else ByteArray.empty
+
+  let member : TarMember := {
+    name := name
+    type := memberType
+    content := content
+  }
+
+  pure (member, nextOffset)
+
+/-- Parse a TAR archive from bytes. Returns array of members. -/
+def parseTar (data : ByteArray) : OracleResult (Array TarMember) := do
+  let mut members : Array TarMember := #[]
+  let mut offset : Nat := 0
+
+  -- Parse members until we hit two zero blocks
+  for _ in [:10000] do  -- Safety limit
+    if offset + HEADER_SIZE > data.size then break
+    if isZeroBlock data offset then break
+
+    let (member, nextOffset) ← parseHeader data offset
+    members := members.push member
+    offset := nextOffset
+
+  -- Validate the parsed archive
+  validateTar members
+
+  pure members
+
+/-- Find a member by name in parsed TAR. -/
+def findMember (members : Array TarMember) (name : String) : Option TarMember :=
+  members.find? (·.name == name)
+
+/-- Extract registry.json content from a bundle TAR. -/
+def extractRegistryJson (data : ByteArray) : OracleResult ByteArray := do
+  let members ← parseTar data
+  match findMember members "registry.json" with
+  | some m => pure m.content
+  | none => throw (ErrorCode.E708_MissingRegistryJson)
+
 end Jolt.Bundle

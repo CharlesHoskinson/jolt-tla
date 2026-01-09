@@ -69,13 +69,14 @@ inductive ErrorCode where
   | E602_TranscriptMismatch
   -- Tar errors (700-799)
   | E700_NonCanonicalTar
-  | E701_InvalidTarHeader
+  | E701_InvalidTarHeader (reason : String)
   | E702_UnsortedMembers
   | E703_NonZeroMtime
   | E704_InvalidPath (reason : String)
   | E705_DuplicateMember
   | E706_InvalidMemberType
   | E707_PAXExtensionPresent
+  | E708_MissingRegistryJson
   deriving DecidableEq, Inhabited
 
 instance : Repr ErrorCode where
@@ -123,13 +124,14 @@ instance : Repr ErrorCode where
     | .E601_CommitmentMismatch => "E601_CommitmentMismatch"
     | .E602_TranscriptMismatch => "E602_TranscriptMismatch"
     | .E700_NonCanonicalTar => "E700_NonCanonicalTar"
-    | .E701_InvalidTarHeader => "E701_InvalidTarHeader"
+    | .E701_InvalidTarHeader r => s!"E701_InvalidTarHeader({r})"
     | .E702_UnsortedMembers => "E702_UnsortedMembers"
     | .E703_NonZeroMtime => "E703_NonZeroMtime"
     | .E704_InvalidPath r => s!"E704_InvalidPath({r})"
     | .E705_DuplicateMember => "E705_DuplicateMember"
     | .E706_InvalidMemberType => "E706_InvalidMemberType"
     | .E707_PAXExtensionPresent => "E707_PAXExtensionPresent"
+    | .E708_MissingRegistryJson => "E708_MissingRegistryJson"
 
 /-- Result type for oracle operations. -/
 abbrev OracleResult (α : Type) := Except ErrorCode α
