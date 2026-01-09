@@ -4,7 +4,7 @@
 
 [![TLA+ CI](https://github.com/CharlesHoskinson/jolt-tla/actions/workflows/tlaplus.yml/badge.svg)](https://github.com/CharlesHoskinson/jolt-tla/actions/workflows/tlaplus.yml)
 [![Lean CI](https://github.com/CharlesHoskinson/jolt-tla/actions/workflows/lean.yml/badge.svg)](https://github.com/CharlesHoskinson/jolt-tla/actions/workflows/lean.yml)
-[![Version](https://img.shields.io/badge/version-0.3.1-blue)]()
+[![Version](https://img.shields.io/badge/version-0.3.2-blue)]()
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 ---
@@ -16,8 +16,9 @@
 cd jolt_oracle && lake build
 
 # 2. Compute a state digest
-echo '{"program_hash":"0000000000000000000000000000000000000000000000000000000000000000","state":{"pc":0,"regs":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"step_counter":0,"rw_mem_root":"0000000000000000000000000000000000000000000000000000000000000000","io_root":"0000000000000000000000000000000000000000000000000000000000000000","halted":0,"exit_code":0,"config_tags":[]}}' > state.json
+echo '{"program_hash":"0x0000000000000000000000000000000000000000000000000000000000000000","state":{"pc":0,"regs":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"step_counter":0,"rw_mem_root":"0x0000000000000000000000000000000000000000000000000000000000000000","io_root":"0x0000000000000000000000000000000000000000000000000000000000000000","halted":0,"exit_code":0,"config_tags":[]}}' > state.json
 lake exe oracle digest state.json
+# Expected: Digest: 24421670062301725635551677633693836338234896090794496795972501815695727753187
 
 # 3. Run TLA+ model checker (requires Java 17+)
 cd ../jolt-tla
@@ -192,6 +193,38 @@ In distributed systems, ambiguity is not a nuisance. It is an attack surface and
 The oracle is correctness-first and fail-closed. Malformed inputs get rejected, not "helpfully" normalized. Differences cannot be glossed over. They are forced into the open.
 
 **What the oracle is not:** A production node optimized for throughput. A network simulator. It focuses on the deterministic functional core—given pre-state and inputs, compute post-state (or reject). That boundary keeps it small, auditable, and stable. When the rules change, you update one ground truth, and the ecosystem gets a new target to align against.
+
+---
+
+## What's New in v0.3.2
+
+### Oracle Poseidon Constants Fixed
+
+Critical bug fix: `Oracle.init` was using `Poseidon.defaultConfig` with empty round constants
+and MDS matrix, causing all state digests to compute incorrectly (returning 0).
+
+**Fixed:** Oracle now uses `joltPoseidonConfig` with the full BLS12-381 constants from
+midnight-circuits v6.0.0 (204 round constants, 3x3 MDS matrix).
+
+### Golden Test Vectors Computed
+
+`test_vectors/golden_v1.json` now contains computed StateDigest values:
+
+| Test Case | Digest (Fr decimal) |
+|-----------|---------------------|
+| minimal_state_zeros | 24421670062301725635551677633693836338234896090794496795972501815695727753187 |
+| typical_state | 30919686901236335602438576816898388225550310633849398790605613577781839025832 |
+| halted_state | 40400183813884747956300889570234739091911790924111649960538043847858548402419 |
+| state_with_config_tags | 51269420250097274214666708236162143841421999722140888943312460699788950625363 |
+
+### Nix Flake Support
+
+Reproducible builds via Nix flakes:
+
+```bash
+nix develop        # Enter dev shell with Lean 4.26.0, Java 17, TLA+ tools
+nix flake check    # Verify flake
+```
 
 ---
 
@@ -757,9 +790,11 @@ These implementation mistakes cause chain splits. The oracle rejects all of them
 
 ## Status
 
-**Released** — v0.3.1
+**Released** — v0.3.2
 
 Feature-complete with executable specification. All 30 invariants pass. Oracle CLI provides conformance testing. TLA+ aligned with Lean Jolt oracle (Status enum, 17 registry keys, 17 domain tags).
+
+**v0.3.2 fixes:** Oracle now computes correct Poseidon digests using joltPoseidonConfig with midnight-circuits v6.0.0 constants. Golden test vectors added. Nix flake support for reproducible builds.
 
 See [CHANGELOG.md](CHANGELOG.md).
 
