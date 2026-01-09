@@ -257,18 +257,6 @@ The prose spec explains decisions. Byte ordering, endianness, domain tags—deta
 
 ---
 
-## Reading Paths
-
-| Starting Point | Path | Time |
-|----------------|------|------|
-| Evaluating for your project | This README → `docs/architecture.md` | 30 min |
-| Building an integration | `spec.md` §5 → §11 | 2-4 hours |
-| Auditing security | `docs/invariants.md` → attack table | 1-2 hours |
-| Studying zkVM design | Full `spec.md` → `JoltContinuations.tla` | 1-2 days |
-| Building your own zkVM | StateDigest algorithm (§11.10) | 2-3 hours |
-
----
-
 ## Verify It Yourself
 
 ### Requirements

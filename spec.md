@@ -44,20 +44,6 @@ This specification covers the proving layer. It does not specify: Settlement Eng
 
 ---
 
-## Reading Paths
-
-Different readers need different paths through this document:
-
-| Audience | Start | Core Path | Reference | Skip |
-|----------|-------|-----------|-----------|------|
-| **Protocol Engineer** | Section 1 | Section 6 -> Section 7 -> Section 8 -> Section 11 -> Section 12 | Section 5 (public inputs) | Sections 13-15 |
-| **Security Auditor** | Section 4 | Section 7 -> Section 8 -> Section 15 -> Section 11 | Section 3 (registry), Section 14 (conformance) | Sections 9-10 internals |
-| **Integration Developer** | Section 1 | Section 5 -> Section 6 -> Section 7 | Section 4 (architecture) | Sections 9-12 (prover internals) |
-| **Technical Leadership** | Section 1 | Section 3 -> Section 4 -> Section 14 -> Section 15 | Section 5 (interface) | Sections 7-12 (implementation) |
-
-**For all readers:** Section 1 provides the conceptual foundation. Section 15 provides the security synthesis. Start with one, reference others as needed.
-
----
 
 ## Document Statistics
 
