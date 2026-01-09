@@ -7,6 +7,31 @@
 [![Version](https://img.shields.io/badge/version-0.3.1-blue)]()
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
+---
+
+## TL;DR — Try It in 60 Seconds
+
+```bash
+# 1. Build the oracle
+cd jolt_oracle && lake build
+
+# 2. Compute a state digest
+echo '{"program_hash":"0000000000000000000000000000000000000000000000000000000000000000","state":{"pc":0,"regs":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"step_counter":0,"rw_mem_root":"0000000000000000000000000000000000000000000000000000000000000000","io_root":"0000000000000000000000000000000000000000000000000000000000000000","halted":0,"exit_code":0,"config_tags":[]}}' > state.json
+lake exe oracle digest state.json
+
+# 3. Run TLA+ model checker (requires Java 17+)
+cd ../jolt-tla
+java -jar tla2tools.jar -config Jolt.cfg tla/MC_Jolt.tla -workers auto
+# Expected: "Model checking completed. No error has been found."
+```
+
+**What you just did:**
+- Built an executable specification that defines "correct" for all Jolt implementations
+- Computed the canonical StateDigest for a minimal VM state
+- Verified that no sequence of operations can violate 30 security invariants
+
+---
+
 ```
 ┌───────────────────────────────────────────────────────────────────────┐
 │                  JOLT CONTINUATION PROVING SYSTEM                     │
@@ -79,6 +104,57 @@ StateDigest = Hash(
 Skip a chunk? The digest chain breaks—output of chunk N-1 won't match input of chunk N+1. Splice executions? Program hashes differ. Forge memory? Merkle roots won't match.
 
 Every attack produces a detectable inconsistency. The spec defines this algorithm to the bit level: encoding, domain separation, byte order. Two implementations following this spec produce identical digests for identical states.
+
+---
+
+## Definitions
+
+**Chunk.** A segment of VM execution, typically 2²⁰ cycles. Each chunk has a start state, end state, and proof. Chunks are numbered sequentially starting from 0.
+
+**Continuation chain.** A sequence of chunks where each chunk's end state digest equals the next chunk's start state digest. The chain proves a complete execution from initial state to halted state.
+
+**StateDigest.** A single field element (Fr) computed by hashing all VM state fields through a Poseidon sponge. Two states with the same digest are identical. Defined in spec.md §11.10.2.
+
+**VMStateV1.** The canonical VM state structure: `pc`, `regs[0..31]`, `step_counter`, `rw_mem_root`, `io_root`, `halted`, `exit_code`, `config_tags`. Register x0 must always be zero (RISC-V invariant).
+
+**Registry key.** A configuration parameter identifier matching `^JOLT_[A-Z0-9_]+_V[0-9]+$`. The spec defines 17 required keys (e.g., `JOLT_POSEIDON_FR_V1`). External handles are computed, not stored.
+
+**Domain tag.** A string prefix used for cryptographic domain separation in transcripts. All tags start with `JOLT/` and contain only `[A-Z0-9/_]`. Prevents cross-protocol attacks.
+
+**Bundle.** A canonical TAR archive containing `registry.json` plus proof artifacts. Paths must be relative, sorted bytewise, with zero mtime. Defined in spec.md §14.3.
+
+**Fr.** A scalar field element of BLS12-381, integers mod r where r = 52435875...513 (254 bits). All cryptographic commitments live in this field.
+
+**Public inputs.** The 11 Fr elements exposed to the verifier: `program_hash`, `old_state_root`, `new_state_root`, `batch_commitment`, `step_count`, `status_fr`, plus five reserved. Defined in spec.md §5.2.
+
+---
+
+## Threat Model
+
+**Attacker capabilities.** The attacker controls:
+- All prover inputs (states, proofs, bundles)
+- Chunk ordering and selection (can omit, reorder, duplicate)
+- Timing of proof submission
+- Choice of configuration parameters (unless pinned by config_tags)
+
+**Attacker goals we defend against:**
+- **Prefix attack**: Prove partial execution, skip validation at step N
+- **Skip attack**: Omit chunks to bypass authorization logic
+- **Splice attack**: Combine chunks from different executions
+- **Replay attack**: Resubmit old proofs for new transactions
+- **Config swap**: Prove with loose parameters, verify with strict
+
+**Assumptions:**
+- Poseidon hash is collision-resistant (cannot find two states with same digest)
+- BLS12-381 discrete log is hard (signatures unforgeable)
+- TLC fingerprint hashing is sufficient for bounded model checking (not production)
+- Verifier has access to correct registry parameters
+
+**Out of scope:**
+- Side-channel attacks on prover implementation
+- Denial of service / resource exhaustion
+- Network-level attacks (eclipse, partition)
+- Bugs in the Lean compiler or TLC model checker
 
 ---
 
@@ -299,6 +375,22 @@ Together they form a defense-in-depth verification strategy:
 
 When the artifacts disagree, prose is authoritative. If TLA+ or Lean conflicts with the prose spec, the formal artifact has a bug. If TLA+ and Lean conflict with each other, check both against prose to find which one diverged.
 
+### Where Is This Rule Implemented?
+
+| Prose § | Concept | TLA+ Module | Lean Module | What's Checked |
+|---------|---------|-------------|-------------|----------------|
+| §2.1.1 | Fr modulus (BLS12-381) | `Types.tla:FR_MODULUS` | `Jolt/Field/Fr.lean` | Field arithmetic bounded |
+| §3.4 | 17 registry keys | `Registry.tla:KEY_*` | `Jolt/Registry/ConfigTags.lean` | Key format validated |
+| §5.2 | 11 public inputs | `Wrapper.tla:PublicInputsV1` | `Jolt/Wrapper/PublicInputs.lean` | Count and layout verified |
+| §7.6 | Bytes32→Fr2 encoding | `Encodings.tla:Bytes32ToFr2` | `Jolt/Encoding/Bytes32.lean` | lo < 2²⁴⁸, hi < 256 |
+| §8.4 | Transcript type tags | `Transcript.tla:TYPE_*` | `Jolt/Transcript/Types.lean` | Domain separation enforced |
+| §8.6 | Tag format validation | `Hash.tla:IsValidTagFormat` | `Jolt/Transcript/TagValidation.lean` | ASCII `[A-Z0-9/_]` only |
+| §11.5 | VMStateV1 structure | `VMState.tla:VMStateV1` | `Jolt/State/VMState.lean` | 8 fields, regs[0]=0 |
+| §11.10.2 | StateDigest algorithm | `Continuations.tla:ComputeStateDigest` | `Jolt/State/Digest.lean` | 14-step Poseidon sponge |
+| §14.3 | TAR canonicalization | `Tar.tla:ValidTar` | `Jolt/Bundle/Tar.lean` | Paths relative, sorted |
+
+Full mapping: `docs/alignment.md`
+
 ---
 
 ## Using the Outputs
@@ -344,6 +436,83 @@ If your Rust/Go/TypeScript implementation produces a different digest than the o
 
 ---
 
+## Walkthrough: Two-Chunk Chain
+
+This example shows a complete execution split into two chunks, demonstrating how StateDigest chaining prevents attacks.
+
+**Chunk 0** — Initial execution (steps 0–24):
+
+```json
+{
+  "chunk_index": 0,
+  "start_state": {
+    "pc": 0, "regs": [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    "step_counter": 0,
+    "rw_mem_root": "0000000000000000000000000000000000000000000000000000000000000000",
+    "io_root": "0000000000000000000000000000000000000000000000000000000000000000",
+    "halted": 0, "exit_code": 0, "config_tags": []
+  },
+  "end_state": {
+    "pc": 100, "regs": [0,5,10,15,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    "step_counter": 25,
+    "rw_mem_root": "1111111111111111111111111111111111111111111111111111111111111111",
+    "io_root": "2222222222222222222222222222222222222222222222222222222222222222",
+    "halted": 0, "exit_code": 0, "config_tags": []
+  }
+}
+```
+
+**Chunk 1** — Continuation (steps 25–50, halts):
+
+```json
+{
+  "chunk_index": 1,
+  "start_state": {
+    "pc": 100, "regs": [0,5,10,15,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    "step_counter": 25,
+    "rw_mem_root": "1111111111111111111111111111111111111111111111111111111111111111",
+    "io_root": "2222222222222222222222222222222222222222222222222222222222222222",
+    "halted": 0, "exit_code": 0, "config_tags": []
+  },
+  "end_state": {
+    "pc": 256, "regs": [0,42,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    "step_counter": 50,
+    "rw_mem_root": "3333333333333333333333333333333333333333333333333333333333333333",
+    "io_root": "4444444444444444444444444444444444444444444444444444444444444444",
+    "halted": 1, "exit_code": 0, "config_tags": []
+  }
+}
+```
+
+**The linkage rule:** `digest(chunk[0].end_state) == digest(chunk[1].start_state)`
+
+Run the oracle to verify:
+
+```bash
+$ lake exe oracle verify chain.json
+{ "status": "ok", "chunks_verified": 2 }
+```
+
+**Now break it.** Change `chunk[1].start_state.pc` from 100 to 101:
+
+```bash
+$ lake exe oracle verify chain_broken.json
+{ "status": "error", "code": "E501", "message": "Digest mismatch at chunk 1" }
+```
+
+The oracle caught a splice attempt. This is `INV_ATK_NoSplice` in action—any modification to a chunk's start state breaks the digest chain.
+
+**Attack → Invariant mapping:**
+
+| Attack | What you changed | Error | TLA+ invariant |
+|--------|------------------|-------|----------------|
+| Skip chunk | Remove chunk 1 entirely | E502 | `INV_ATK_NoSkipChunk` |
+| Splice | Modify start_state | E501 | `INV_ATK_NoSplice` |
+| Prefix | Submit only chunk 0 | E503 | `INV_ATK_NoPrefixProof` |
+| Replay | Reuse old chain with same nonce | E501 | `INV_ATK_NoReplay` (digest includes nonce) |
+
+---
+
 ## Verify It Yourself
 
 ### Requirements
@@ -382,6 +551,24 @@ Model checking completed. No error has been found.
 
 Seven states because TLC uses small bounds (3 steps/chunk, 5 max chunks). Enough to hit all transition types. The invariants are algebraic—they don't depend on scale.
 
+**Why small bounds are sufficient:**
+
+The invariants fall into two categories:
+
+1. **Scale-independent** (25 of 30): These check structural properties that don't depend on state size. `INV_ATK_NoSkipChunk` verifies chunk indices are sequential—true for 3 chunks or 3 million. `INV_SAFE_RegisterX0` checks regs[0]=0—independent of how many steps executed.
+
+2. **Bounded by design** (5 of 30): These involve finite enumerations. `INV_TYPE_StatusEnum` checks status ∈ {0,1,2}—only 3 values to check. Registry key validation covers exactly 17 keys.
+
+**What TLC cannot check:**
+- Collision resistance (assumes Poseidon hash is ideal)
+- Computational limits (Fr operations use 16384-bit bound, not 254-bit)
+- Concurrent interleavings (model is sequential)
+
+**Compensation strategy:**
+- Lean oracle provides exact Fr arithmetic (254-bit)
+- Golden test vectors catch byte-level implementation drift
+- CI runs both TLC and `lake exe test` on every commit
+
 ### Continuous Integration
 
 Every push runs TLA+ verification via GitHub Actions. See `.github/workflows/tlaplus.yml`. Artifacts include full TLC output showing which invariants were checked.
@@ -392,7 +579,7 @@ Every push runs TLA+ verification via GitHub Actions. See `.github/workflows/tla
 
 ```
 jolt-tla/
-├── JoltContinuations.tla    # <- Start here
+├── JoltContinuations.tla    # Legacy monolith (use tla/MC_Jolt.tla instead)
 ├── Jolt.cfg                 # TLC configuration
 ├── WrapperValidation.cfg    # Wrapper tests config
 ├── spec.md                  # Full prose spec (17 sections)
@@ -539,6 +726,32 @@ jolt> set field value   # Modify state fields
 jolt> show              # Display current state
 jolt> quit              # Exit REPL
 ```
+
+---
+
+## Consensus Footguns
+
+These implementation mistakes cause chain splits. The oracle rejects all of them—if your implementation doesn't, you'll fork.
+
+**JSON canonicalization.** JCS (RFC 8785) sorts keys by UTF-16 code unit, not byte value. `"a"` < `"b"` but `"Z"` < `"a"`. Duplicate keys must error, not last-wins. The oracle enforces this; many JSON libraries don't.
+
+**Integer bounds.** JSON integers must fit in ±(2⁵³−1) per spec §2.6.1. Larger values must be strings. Silent truncation to 64-bit causes different hashes on different platforms.
+
+**Byte order.** Fr elements serialize little-endian. StateDigest absorbs fields in a specific order (pc → regs[0..31] → step_counter). Swapping the order changes the digest.
+
+**Domain separation.** Every Poseidon invocation starts with a domain tag (`JOLT/STATE/V1`, `JOLT/TRANSCRIPT/V1`, etc.). Missing or wrong tags let attackers replay commitments across contexts.
+
+**Type tag confusion.** Transcript absorption uses type discriminators: BYTES=1, U64=2, TAG=3, VEC=4. Absorbing a U64 as BYTES produces a different challenge. The oracle catches this; hand-rolled code might not.
+
+**Register x0.** RISC-V requires `regs[0] = 0` always. A state with `regs[0] = 1` is invalid. Some implementations skip this check, creating unprovable states.
+
+**Halted semantics.** `halted ∈ {0, 1}`, not a boolean that might be 2 or 255. When `halted = 0`, `exit_code` must be 0. Violating these constraints produces error E404/E405.
+
+**Config tag ordering.** Config tags in the digest must match the projection from §3.8, sorted bytewise. Computing them differently (e.g., insertion order) breaks cross-implementation verification.
+
+**Tar canonicalization.** Bundle archives must have zero mtime, no absolute paths, no `..`, and entries sorted bytewise. `tar` defaults don't produce canonical output; you need explicit flags.
+
+**Error precedence.** When multiple errors apply, the spec defines which wins (§16). Returning E501 when E400 should fire causes verification mismatches.
 
 ---
 
