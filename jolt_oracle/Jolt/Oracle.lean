@@ -3,6 +3,7 @@ import Jolt.Field.Fr
 import Jolt.Encoding.Bytes32
 import Jolt.Encoding.Fr2
 import Jolt.Poseidon.Sponge
+import Jolt.Poseidon.Constants
 import Jolt.Transcript.State
 import Jolt.State.VMState
 import Jolt.State.Digest
@@ -45,9 +46,9 @@ structure Chain where
 
 namespace Oracle
 
-/-- Initialize oracle with default configuration. -/
+/-- Initialize oracle with JOLT_POSEIDON_FR_V1 configuration. -/
 def init : OracleConfig where
-  poseidon := Poseidon.defaultConfig
+  poseidon := Poseidon.Constants.joltPoseidonConfig
 
 /-- Compute state digest for a VM state. -/
 def computeStateDigest (cfg : OracleConfig) (programHash : Bytes32)
