@@ -19,9 +19,6 @@ Uses standard Lean 4 library. Key lemmas:
 - `decide_eq_true_eq` : (decide p = true) = p
 - `Bool.and_eq_true` : (a && b = true) <-> (a = true /\ b = true)
 
-## References
-
-* GPT Research Q3: Use `Bool.of_decide_true` pattern
 -/
 
 namespace Jolt

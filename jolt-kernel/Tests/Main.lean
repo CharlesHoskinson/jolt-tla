@@ -19,10 +19,6 @@ Test suite for the Jolt kernel.
 ```bash
 lake test
 ```
-
-## References
-
-* GPT Research Q7 (lake test with IO executable)
 -/
 
 open Jolt

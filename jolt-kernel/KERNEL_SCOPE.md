@@ -23,15 +23,15 @@
 
 Every `check : a -> Bool` has `theorem check_sound : check x = true -> Spec x`
 
-## Design Decisions (GPT Research-Backed)
+## Design Decisions
 
 | Component | Decision | Rationale |
 |-----------|----------|-----------|
-| Fr type | `def Fr := Fin r` | Enforces canonicity, rejects non-canonical (Q2) |
-| Vectors | `Vector a n` | Array-backed, O(1) access (Q4) |
-| Bytes32 | `Vector UInt8 32` | Type-level length guarantee (Q4) |
-| Prop/Bool | `checkFoo = decide SpecFoo` | Easy soundness via `Bool.of_decide_true` (Q3) |
-| Poseidon | `constant PoseidonPermute` | Minimal axiom, document as TCB (Q5) |
+| Fr type | `def Fr := Fin r` | Enforces canonicity, rejects non-canonical |
+| Vectors | `Vector a n` | Array-backed, O(1) access |
+| Bytes32 | `Vector UInt8 32` | Type-level length guarantee |
+| Prop/Bool | `checkFoo = decide SpecFoo` | Easy soundness via `Bool.of_decide_true` |
+| Poseidon | `constant PoseidonPermute` | Minimal axiom, document as TCB |
 
 ## Audit Checklist
 
