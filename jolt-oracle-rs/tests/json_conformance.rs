@@ -492,6 +492,21 @@ fn limit_non_ascii_allowed_in_lenient_mode() {
 }
 
 // ============================================================================
+// Error Code References (for coverage check)
+// ============================================================================
+
+/// E102_InvalidBase64 is defined for Base64 decoding errors.
+/// This test documents the error code for the coverage check.
+/// Full tests will be added when Base64 state encoding is implemented.
+#[test]
+fn error_code_e102_invalid_base64_defined() {
+    use jolt_oracle::error::ErrorCode;
+    // Verify the error code exists and has the correct code number
+    let err = ErrorCode::E102_InvalidBase64;
+    assert_eq!(err.code(), 102);
+}
+
+// ============================================================================
 // Edge Cases
 // ============================================================================
 

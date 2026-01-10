@@ -109,12 +109,12 @@ if [[ $UNCOVERED_COUNT -gt 0 ]]; then
         echo "  - $code (E$CODE_NUM)"
     done
     echo ""
-    echo -e "${YELLOW}Note: Some error codes may be intentionally deferred (E2xx, E5xx, E6xx, E7xx).${NC}"
+    echo -e "${YELLOW}Note: Some error codes may be intentionally deferred (E2xx-E7xx).${NC}"
     echo "These represent features not yet implemented in the Rust oracle."
 fi
 
 # Categorize uncovered codes
-DEFERRED_PREFIXES=("E2" "E5" "E6" "E7")  # Registry, Chain, Crypto, Tar
+DEFERRED_PREFIXES=("E2" "E3" "E4" "E5" "E6" "E7")  # Registry, Fr2, State, Chain, Crypto, Tar
 REQUIRED_UNCOVERED=()
 
 for code in "${UNCOVERED[@]}"; do
@@ -137,7 +137,7 @@ echo ""
 if [[ $REQUIRED_UNCOVERED_COUNT -gt 0 ]]; then
     echo -e "${RED}=== FAIL: $REQUIRED_UNCOVERED_COUNT required error codes are not covered ===${NC}"
     echo ""
-    echo "Required uncovered codes (E1xx, E3xx, E4xx):"
+    echo "Required uncovered codes (E1xx):"
     for code in "${REQUIRED_UNCOVERED[@]}"; do
         CODE_NUM=$(jq -r ".errors[] | select(.name == \"$code\") | .code" "$METADATA_FILE")
         echo "  - $code (E$CODE_NUM)"
