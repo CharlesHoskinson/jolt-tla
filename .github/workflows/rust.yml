@@ -234,6 +234,9 @@ jobs:
     name: Cross-Platform Replay
     runs-on: ubuntu-latest
     needs: [build-linux-musl, build-macos-arm64, build-windows]
+    defaults:
+      run:
+        working-directory: .
     steps:
       - uses: actions/checkout@v4
 
@@ -261,6 +264,7 @@ jobs:
       - name: List downloaded files
         run: |
           echo "=== Directory structure ==="
+          pwd
           ls -la
           echo "=== Replay results ==="
           ls -la replay-results/ || echo "replay-results/ not found"
