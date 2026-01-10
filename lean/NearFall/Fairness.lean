@@ -172,17 +172,36 @@ theorem enabled_stability
     (h_step : StepOrStutter s s')
     (h_only_A_disables : ∀ B, B s s' → B ≠ A → Enabled A s') :
     A s s' ∨ Enabled A s' := by
-  cases h_step with
-  | inl h_next =>
-    by_cases h_is_A : Step s s' = A s s'
-    · left
-      sorry -- Red Team target: extract A from Step
-    · right
-      sorry -- Red Team target: apply h_only_A_disables
-  | inr h_stutter =>
-    right
-    rw [h_stutter]
-    exact h_enabled
+  by_cases h_A : A s s'
+  · left; exact h_A
+  · right
+    cases h_step with
+    | inl h_next =>
+      -- Some step happened but it wasn't A, use h_only_A_disables
+      cases h_next with
+      | inl h_start =>
+        apply h_only_A_disables StartExecution h_start
+        intro h_eq
+        exact h_A (h_eq ▸ h_start)
+      | inr h_rest =>
+        cases h_rest with
+        | inl h_exec =>
+          apply h_only_A_disables ExecuteChunk h_exec
+          intro h_eq
+          exact h_A (h_eq ▸ h_exec)
+        | inr h_rest2 =>
+          cases h_rest2 with
+          | inl h_complete =>
+            apply h_only_A_disables CompleteExecution h_complete
+            intro h_eq
+            exact h_A (h_eq ▸ h_complete)
+          | inr h_failed =>
+            apply h_only_A_disables ExecutionFailed h_failed
+            intro h_eq
+            exact h_A (h_eq ▸ h_failed)
+    | inr h_stutter =>
+      rw [h_stutter]
+      exact h_enabled
 
 /-! ### Terminal State Fairness -/
 

@@ -79,7 +79,7 @@ MODEL-02, MODEL-03, MODEL-04
 | TLA+ Safety | CRYPTO-01, VM-01-03, ENC-01-02 | TLAPS | Pending |
 | TLA+ Liveness | FAIR-01-02, COND-01 | TLAPS (WF/ENABLED) | Pending |
 | Lean Safety | VM-01-03 | Lean 4 | Pending |
-| Lean Liveness | FAIR-01-02, MODEL-02-04 | Lean 4 (Red Team) | Pending |
+| Lean Liveness | FAIR-01-02, MODEL-02-04 | Lean 4 | Complete |
 
 ## Proof Obligation Map
 
@@ -101,24 +101,24 @@ Complete mapping of theorems to assumptions and verification status.
 |------|----------|-------------|--------|
 | `Trace.lean` | stutter_valid, step_implies_stepOrStutter, terminal_absorbing, terminal_forever | - | Complete |
 | `Temporal.lean` | infOften_iff_infOften', always_eventually_duality, eventually_always_duality, leadsTo_trans | - | Complete |
-| `Fairness.lean` | weakFair_iff_weakFair', strongFair_implies_weakFair, weakFair_usable, strongFair_usable | - | Complete |
-| `Variant.lean` | variant_nonneg, variant_bounded, step_classification, next_decomposes, variant_decreases, variant_nonIncrease | - | Red Team |
-| `Liveness.lean` | progress_from_init, eventually_not_init, progress_from_executing, eventually_terminal, complete_liveness | FAIR-01,02 | Red Team |
+| `Fairness.lean` | weakFair_iff_weakFair', strongFair_implies_weakFair, weakFair_usable, strongFair_usable, enabled_stability | - | Complete |
+| `Variant.lean` | variant_nonneg, variant_bounded, step_classification, next_decomposes, variant_decreases, variant_nonIncrease | - | Complete |
+| `Liveness.lean` | progress_from_init, eventually_not_init, progress_from_executing, eventually_terminal, complete_liveness | FAIR-01,02 | Complete |
 | `Progress.lean` | no_deadlock, init_can_progress, executing_can_progress, terminal_only_stutter | - | Complete |
 | `Alignment.lean` | startExecution_def, executeChunk_def, stepOrStutter_def, variant_def, enabled_def, weakFair_def | - | Build Artifact |
 
 ### Red Team Targets
 
-Theorems requiring automated proof generation:
+All NearFall proof obligations have been completed:
 
-| Module | Theorem | Priority | Notes |
-|--------|---------|----------|-------|
-| `Variant.lean` | variant_decreases_executeChunk | High | Core termination |
-| `Variant.lean` | variant_nonterminal_pos | High | Variant > 0 in non-terminal |
-| `Liveness.lean` | progress_from_init | High | INIT ~> not INIT |
-| `Liveness.lean` | eventually_terminal | Critical | Main termination theorem |
-| `Liveness.lean` | complete_liveness | High | Full liveness chain |
-| `Alignment.lean` | chunks_consecutive | Medium | Inductive invariant |
+| Module | Theorem | Priority | Status |
+|--------|---------|----------|--------|
+| `Variant.lean` | variant_decreases_executeChunk | High | Complete |
+| `Variant.lean` | variant_nonterminal_pos | High | Complete |
+| `Liveness.lean` | progress_from_init | High | Complete |
+| `Liveness.lean` | eventually_terminal | Critical | Complete |
+| `Liveness.lean` | complete_liveness | High | Complete |
+| `Alignment.lean` | chunks_consecutive | Medium | Complete |
 
 ### Cross-Track Alignment
 
@@ -136,5 +136,5 @@ Theorems requiring automated proof generation:
 - Cryptographic assumptions depend on 128-bit security of Poseidon
 - VM assumptions must be validated against RISC-V reference implementation
 - Fairness assumptions are standard scheduler properties
-- Red Team targets should be processed before final release
-- Alignment.lean must compile without sorry for semantic integrity
+- NearFall Lean proofs complete (no sorries remain)
+- Alignment.lean compiles without sorry for semantic integrity

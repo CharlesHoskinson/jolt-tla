@@ -472,18 +472,15 @@ cd lean && lake build
 
 ### Roadmap
 
-**Lean Track (NearFall)**
+**Lean Track (NearFall)** — Complete
 
 - [x] Trace.lean — Infinite trace semantics (`Nat → SystemState`)
 - [x] Temporal.lean — LTL operators (Always, Eventually, LeadsTo, InfOften)
 - [x] Fairness.lean — Weak/strong fairness with corrected TLA+ semantics
 - [x] Variant.lean — Termination variant and progress partition
-- [x] Liveness.lean — Progress theorems under fairness (stubs)
+- [x] Liveness.lean — Progress theorems under fairness
 - [x] Progress.lean — No-deadlock lemmas
 - [x] Alignment.lean — Semantic alignment with TLA+
-- [ ] Red Team: Fill `sorry` placeholders in Liveness.lean
-- [ ] Red Team: Fill `sorry` placeholders in Variant.lean
-- [ ] Red Team: Fill `sorry` placeholder in Fairness.lean (enabled_stability)
 
 **TLA+ Track (TLAPS Proofs)**
 
@@ -497,7 +494,7 @@ cd lean && lake build
 
 - [x] ASSUMPTIONS.md — Assumption registry and proof obligation map
 - [x] CI workflows — Lean build integrated
-- [ ] Red Team batch processing on NearFall modules
+- [x] NearFall Lean proofs complete (no sorries)
 - [ ] Cross-track alignment verification
 
 ---

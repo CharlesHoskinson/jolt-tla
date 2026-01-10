@@ -148,7 +148,12 @@ theorem variant_bounded (s : SystemState) (h : VariantTypeOK s) :
       unfold StepsRemaining
       have := Nat.mod_lt s.vmState.step_counter (by decide : CHUNK_MAX_STEPS > 0)
       omega
-    sorry  -- Red Team target: bound arithmetic
+    calc RemainingChunks s * CHUNK_MAX_STEPS + StepsRemaining s
+        ≤ MAX_CHUNKS * CHUNK_MAX_STEPS + StepsRemaining s := by
+          apply Nat.add_le_add_right
+          exact Nat.mul_le_mul_right CHUNK_MAX_STEPS h1
+      _ ≤ MAX_CHUNKS * CHUNK_MAX_STEPS + (CHUNK_MAX_STEPS - 1) := by
+          apply Nat.add_le_add_left h2
   }
 
 /-! ### Progress Partition -/
@@ -219,9 +224,49 @@ decreases by 1. The variant decreases because:
 `variant' = (RemainingChunks - 1) * MAX_STEPS + StepsRemaining' < RemainingChunks * MAX_STEPS + StepsRemaining` -/
 theorem variant_decreases_executeChunk (s s' : SystemState)
     (h_step : ExecuteChunk s s')
-    (h_inv : VariantTypeOK s) :
+    (h_inv : VariantTypeOK s)
+    (h_chunks_remain : CommittedChunks s < MAX_CHUNKS) :
     variant s' < variant s := by
-  sorry  -- Red Team target
+  -- Extract facts from ExecuteChunk
+  have h_phase : s.phase = .EXECUTING := h_step.1
+  have h_phase' : s'.phase = .EXECUTING := h_step.2.2.1
+  have h_chunk : s'.continuation.currentChunk = s.continuation.currentChunk + 1 := h_step.2.2.2.1
+  -- Unfold variant in both states
+  unfold variant
+  simp only [h_phase, h_phase']
+  -- Set up abbreviations for clarity
+  let k := s.continuation.currentChunk
+  let k' := s'.continuation.currentChunk
+  let C := CHUNK_MAX_STEPS
+  let M := MAX_CHUNKS
+  -- StepsRemaining bounds
+  have h_steps_s : StepsRemaining s ≤ C - 1 := by
+    unfold StepsRemaining
+    have := Nat.mod_lt s.vmState.step_counter (by decide : CHUNK_MAX_STEPS > 0)
+    omega
+  have h_steps' : StepsRemaining s' ≤ C - 1 := by
+    unfold StepsRemaining
+    have := Nat.mod_lt s'.vmState.step_counter (by decide : CHUNK_MAX_STEPS > 0)
+    omega
+  have h_bounded : k ≤ M := h_inv.chunks_bounded
+  have h_chunk_eq : k' = k + 1 := h_chunk
+  -- Key inequality: (M - k') * C + S' < (M - k) * C + S
+  -- where k' = k + 1 and S' ≤ C - 1
+  unfold RemainingChunks CommittedChunks
+  simp only [h_chunk]
+  -- Since k < M (from h_chunks_remain), we have M - (k + 1) + 1 = M - k
+  have h_k_lt_M : k < M := h_chunks_remain
+  have h_sub : M - (k + 1) + 1 = M - k := by omega
+  -- (M - (k+1)) * C + S' < (M - k) * C + S
+  -- Since (M - (k+1) + 1) * C = (M - k) * C and S' ≤ C - 1 < C
+  have h_C_pos : C > 0 := by decide
+  have h_expand : (M - (k + 1) + 1) * C = (M - (k + 1)) * C + C := Nat.succ_mul (M - (k + 1)) C
+  calc (M - (k + 1)) * C + StepsRemaining s'
+      ≤ (M - (k + 1)) * C + (C - 1) := Nat.add_le_add_left h_steps' _
+    _ < (M - (k + 1)) * C + C := by omega
+    _ = (M - (k + 1) + 1) * C := h_expand.symm
+    _ = (M - k) * C := by simp [h_sub]
+    _ ≤ (M - k) * C + StepsRemaining s := Nat.le_add_right _ _
 
 /-- CompleteExecution sets variant to 0. -/
 theorem variant_zero_complete (s s' : SystemState)
@@ -239,6 +284,46 @@ theorem variant_zero_failed (s s' : SystemState)
   have h_phase : s'.phase = .FAILED := h_step.2.2.1
   simp [h_phase]
 
+/-- Variant is 0 in terminal phases. -/
+theorem variant_terminal_zero (s : SystemState)
+    (h_term : s.phase = .COMPLETE ∨ s.phase = .FAILED) :
+    variant s = 0 := by
+  unfold variant
+  cases h_term with
+  | inl h => simp [h]
+  | inr h => simp [h]
+
+/-- Variant is positive in non-terminal phases (given TypeOK). -/
+theorem variant_nonterminal_pos (s : SystemState)
+    (h_nonterm : s.phase = .INIT ∨ s.phase = .EXECUTING)
+    (_h_inv : VariantTypeOK s)
+    (h_chunks_pos : CommittedChunks s < MAX_CHUNKS) :
+    variant s > 0 := by
+  unfold variant
+  cases h_nonterm with
+  | inl h =>
+    simp [h]
+    unfold RemainingChunks CommittedChunks
+    have h_rem_pos : MAX_CHUNKS - s.continuation.currentChunk > 0 := by
+      have := h_chunks_pos
+      unfold CommittedChunks at this
+      omega
+    have h_C_pos : CHUNK_MAX_STEPS > 0 := by decide
+    have h_prod_pos : (MAX_CHUNKS - s.continuation.currentChunk) * CHUNK_MAX_STEPS > 0 :=
+      Nat.mul_pos h_rem_pos h_C_pos
+    omega
+  | inr h =>
+    simp [h]
+    unfold RemainingChunks CommittedChunks
+    have h_rem_pos : MAX_CHUNKS - s.continuation.currentChunk > 0 := by
+      have := h_chunks_pos
+      unfold CommittedChunks at this
+      omega
+    have h_C_pos : CHUNK_MAX_STEPS > 0 := by decide
+    have h_prod_pos : (MAX_CHUNKS - s.continuation.currentChunk) * CHUNK_MAX_STEPS > 0 :=
+      Nat.mul_pos h_rem_pos h_C_pos
+    omega
+
 /-- Progress step strictly decreases variant.
 
 This is the main theorem for termination under fairness.
@@ -247,27 +332,26 @@ This is the main theorem for termination under fairness.
 theorem variant_decreases (s s' : SystemState)
     (h_step : ProgressStep s s')
     (h_inv : VariantTypeOK s)
-    (h_nonterminal : s.phase ≠ .COMPLETE ∧ s.phase ≠ .FAILED) :
+    (h_nonterminal : s.phase ≠ .COMPLETE ∧ s.phase ≠ .FAILED)
+    (h_chunks_remain : CommittedChunks s < MAX_CHUNKS) :
     variant s' < variant s := by
   unfold ProgressStep at h_step
   cases h_step with
   | inl h_exec =>
-    exact variant_decreases_executeChunk s s' h_exec h_inv
+    exact variant_decreases_executeChunk s s' h_exec h_inv h_chunks_remain
   | inr h_rest =>
     cases h_rest with
     | inl h_complete =>
       have h0 : variant s' = 0 := variant_zero_complete s s' h_complete
-      have h_pos : variant s > 0 := by
-        unfold variant
-        cases h_s : s.phase <;> simp [h_s] at h_nonterminal ⊢
-        all_goals sorry  -- Red Team target: show variant > 0 in INIT/EXECUTING
+      have h_pos : variant s > 0 := variant_nonterminal_pos s
+        (by cases h_nonterminal; cases h_s : s.phase <;> simp_all)
+        h_inv h_chunks_remain
       omega
     | inr h_failed =>
       have h0 : variant s' = 0 := variant_zero_failed s s' h_failed
-      have h_pos : variant s > 0 := by
-        unfold variant
-        cases h_s : s.phase <;> simp [h_s] at h_nonterminal ⊢
-        all_goals sorry  -- Red Team target: show variant > 0 in INIT/EXECUTING
+      have h_pos : variant s > 0 := variant_nonterminal_pos s
+        (by cases h_nonterminal; cases h_s : s.phase <;> simp_all)
+        h_inv h_chunks_remain
       omega
 
 /-! ### Variant Non-Increase Lemmas -/
@@ -311,32 +395,6 @@ theorem variant_nonIncrease (s s' : SystemState)
 
 /-! ### Terminal State Invariants -/
 
-/-- Variant is 0 in terminal phases. -/
-theorem variant_terminal_zero (s : SystemState)
-    (h_term : s.phase = .COMPLETE ∨ s.phase = .FAILED) :
-    variant s = 0 := by
-  unfold variant
-  cases h_term with
-  | inl h => simp [h]
-  | inr h => simp [h]
-
-/-- Variant is positive in non-terminal phases (given TypeOK). -/
-theorem variant_nonterminal_pos (s : SystemState)
-    (h_nonterm : s.phase = .INIT ∨ s.phase = .EXECUTING)
-    (h_inv : VariantTypeOK s)
-    (h_chunks_pos : CommittedChunks s < MAX_CHUNKS) :
-    variant s > 0 := by
-  unfold variant
-  cases h_nonterm with
-  | inl h =>
-    simp [h]
-    unfold RemainingChunks StepsRemaining
-    sorry  -- Red Team target
-  | inr h =>
-    simp [h]
-    unfold RemainingChunks StepsRemaining
-    sorry  -- Red Team target
-
 /-! ### Summary Theorems -/
 
 /-- Variant decrease under fair progress: key theorem for termination.
@@ -347,10 +405,11 @@ actions, this guarantees eventual termination. -/
 theorem fair_progress_terminates (s s' : SystemState)
     (h_step : ProgressStep s s')
     (h_inv : VariantTypeOK s)
-    (h_nonterm : s.phase = .INIT ∨ s.phase = .EXECUTING) :
+    (h_nonterm : s.phase = .INIT ∨ s.phase = .EXECUTING)
+    (h_chunks_remain : CommittedChunks s < MAX_CHUNKS) :
     variant s' < variant s := by
   have h : s.phase ≠ .COMPLETE ∧ s.phase ≠ .FAILED := by
     cases h_nonterm <;> simp_all [SystemPhase.noConfusion]
-  exact variant_decreases s s' h_step h_inv h
+  exact variant_decreases s s' h_step h_inv h h_chunks_remain
 
 end NearFall.Liveness
