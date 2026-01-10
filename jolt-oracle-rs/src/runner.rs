@@ -83,8 +83,7 @@ impl LeanRunner {
             return Err(ErrorCode::E100_InvalidJSON);
         }
 
-        String::from_utf8(output.stdout)
-            .map_err(|_| ErrorCode::E105_InvalidUTF8)
+        String::from_utf8(output.stdout).map_err(|_| ErrorCode::E105_InvalidUTF8)
     }
 
     /// Generate corpus from the Lean oracle.
@@ -95,8 +94,7 @@ impl LeanRunner {
             return Err(ErrorCode::E100_InvalidJSON);
         }
 
-        String::from_utf8(output.stdout)
-            .map_err(|_| ErrorCode::E105_InvalidUTF8)
+        String::from_utf8(output.stdout).map_err(|_| ErrorCode::E105_InvalidUTF8)
     }
 
     /// Parse a result from JSON output.

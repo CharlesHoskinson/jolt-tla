@@ -32,13 +32,14 @@ serde_json = "1.0"
 # Hex encoding
 hex = "0.4"
 
+# Temporary files for Lean oracle subprocess
+tempfile = "3.10"
+
 [build-dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
 [dev-dependencies]
-# For conformance testing
-tempfile = "3.10"
 
 [features]
 default = []
@@ -48,6 +49,12 @@ trace = []
 [profile.release]
 lto = true
 codegen-units = 1
+
+# Profile for distribution binaries (smaller, stripped)
+[profile.release-dist]
+inherits = "release"
+strip = true
+panic = "abort"
 
 # Lints for consensus-critical code
 [lints.clippy]

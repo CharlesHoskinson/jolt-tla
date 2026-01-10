@@ -1,4 +1,5 @@
 import Jolt.Oracle
+import Jolt.Properties
 
 /-!
 # Jolt Oracle

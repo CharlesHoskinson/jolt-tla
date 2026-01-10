@@ -25,23 +25,27 @@ impl ParsedConstants {
         let mut mds = [[Fr::ZERO; WIDTH]; WIDTH];
         for i in 0..WIDTH {
             for j in 0..WIDTH {
-                mds[i][j] = Fr::from_hex(MDS_MATRIX[i][j])
-                    .unwrap_or(Fr::ZERO);
+                mds[i][j] = Fr::from_hex(MDS_MATRIX[i][j]).unwrap_or(Fr::ZERO);
             }
         }
 
         // Parse round constants from hex strings
-        let mut round_constants = Vec::with_capacity(FULL_ROUNDS + PARTIAL_ROUNDS);
-        for round in 0..(FULL_ROUNDS + PARTIAL_ROUNDS) {
-            let mut constants = [Fr::ZERO; WIDTH];
-            for i in 0..WIDTH {
-                constants[i] = Fr::from_hex(ROUND_CONSTANTS[round][i])
-                    .unwrap_or(Fr::ZERO);
-            }
-            round_constants.push(constants);
-        }
+        let round_constants = ROUND_CONSTANTS
+            .iter()
+            .take(FULL_ROUNDS + PARTIAL_ROUNDS)
+            .map(|round_consts| {
+                let mut constants = [Fr::ZERO; WIDTH];
+                for (i, hex) in round_consts.iter().enumerate().take(WIDTH) {
+                    constants[i] = Fr::from_hex(hex).unwrap_or(Fr::ZERO);
+                }
+                constants
+            })
+            .collect();
 
-        Self { mds, round_constants }
+        Self {
+            mds,
+            round_constants,
+        }
     }
 }
 
@@ -63,11 +67,11 @@ fn apply_mds(state: &[Fr; WIDTH]) -> [Fr; WIDTH] {
     let constants = get_constants();
     let mut result = [Fr::ZERO; WIDTH];
 
-    for i in 0..WIDTH {
-        let mut sum = Fr::ZERO;
-        for j in 0..WIDTH {
-            sum = sum + constants.mds[i][j] * state[j];
-        }
+    for (i, row) in constants.mds.iter().enumerate() {
+        let sum = row
+            .iter()
+            .zip(state.iter())
+            .fold(Fr::ZERO, |acc, (m, s)| acc + *m * *s);
         result[i] = sum;
     }
 
@@ -77,16 +81,19 @@ fn apply_mds(state: &[Fr; WIDTH]) -> [Fr; WIDTH] {
 /// Add round constants to state.
 fn add_round_constants(state: &mut [Fr; WIDTH], round: usize) {
     let constants = get_constants();
-    for i in 0..WIDTH {
-        state[i] = state[i] + constants.round_constants[round][i];
+    for (s, c) in state
+        .iter_mut()
+        .zip(constants.round_constants[round].iter())
+    {
+        *s = *s + *c;
     }
 }
 
 /// Full round: S-box on all elements, then MDS, then add constants.
 fn full_round(state: &mut [Fr; WIDTH], round: usize) {
     // S-box on all elements
-    for i in 0..WIDTH {
-        state[i] = sbox(state[i]);
+    for s in state.iter_mut() {
+        *s = sbox(*s);
     }
 
     // MDS matrix multiplication

@@ -1,0 +1,11 @@
+# Cargo configuration for cross-compilation targets
+
+# Linux x86_64 musl (static linking)
+[target.x86_64-unknown-linux-musl]
+# Use musl-gcc as the linker when building on Linux
+# On GitHub Actions, this is provided by the musl-tools package
+linker = "musl-gcc"
+
+# macOS ARM64
+[target.aarch64-apple-darwin]
+# Default linker works on native macOS

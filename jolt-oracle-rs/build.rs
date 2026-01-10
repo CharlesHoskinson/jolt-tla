@@ -72,7 +72,10 @@ fn main() {
     let metadata: Metadata = match serde_json::from_str(&metadata_content) {
         Ok(m) => m,
         Err(e) => {
-            eprintln!("Warning: Could not parse metadata.json: {}. Using fallback.", e);
+            eprintln!(
+                "Warning: Could not parse metadata.json: {}. Using fallback.",
+                e
+            );
             generate_stub_files();
             return;
         }
@@ -94,7 +97,10 @@ fn main() {
     generate_modulus_rs(out_path, &metadata.field);
     generate_params_rs(out_path, &metadata.poseidon);
 
-    println!("cargo:warning=Generated code from metadata.json v{}", metadata.version);
+    println!(
+        "cargo:warning=Generated code from metadata.json v{}",
+        metadata.version
+    );
 }
 
 fn generate_stub_files() {
@@ -220,7 +226,9 @@ pub enum ErrorCode {
                     format!("/* {} */ {}", p, ty)
                 })
                 .collect();
-            let param_refs: Vec<String> = (0..error.params.len()).map(|i| format!("{{{}}}", i)).collect();
+            let param_refs: Vec<String> = (0..error.params.len())
+                .map(|i| format!("{{{}}}", i))
+                .collect();
             code.push_str(&format!(
                 "    #[error(\"{name}({refs})\")]\n    {name}({params}),\n\n",
                 name = variant_name,
