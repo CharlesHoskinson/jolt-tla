@@ -65,11 +65,22 @@ pub enum TestResult {
     /// Test passed.
     Pass,
     /// Test failed with mismatch.
-    Fail { expected: String, actual: String },
+    Fail {
+        /// Expected result from the corpus.
+        expected: String,
+        /// Actual result from the Rust implementation.
+        actual: String,
+    },
     /// Test was skipped (operation not implemented).
-    Skip { reason: String },
+    Skip {
+        /// Reason for skipping.
+        reason: String,
+    },
     /// Test errored during execution.
-    Error { message: String },
+    Error {
+        /// Error message.
+        message: String,
+    },
 }
 
 impl TestResult {
