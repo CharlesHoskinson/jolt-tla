@@ -99,20 +99,32 @@
   - [x] `scripts/check-error-coverage.sh` script
   - [x] CI job in rust.yml workflow
   - [x] Makefile target `error-coverage`
-  - [x] Distinguishes required (E1xx, E3xx, E4xx) from deferred (E2xx, E5xx, E6xx, E7xx) codes
+  - [x] Distinguishes required (E1xx) from deferred (E2xx-E7xx) codes
+- [x] Metadata drift detection in CI
+  - [x] `scripts/check-metadata-drift.sh` script
+  - [x] CI job in rust.yml workflow
+  - [x] Makefile target `metadata-drift`
+  - [x] Validates metadata.json structure and Poseidon parameters
+  - [x] Verifies BLS12-381 modulus, error code count, round constants
 
 ---
 
-## CI Pipeline (Target)
+## CI Pipeline (Implemented)
 
-| Job | Purpose |
-|-----|---------|
-| A | Rust hygiene (fmt, clippy, no HashMap/panic in consensus paths) |
-| B | Metadata/codegen drift detection |
-| C | Conformance (full corpus) |
-| D | Cross-platform replay |
-| E | Supply chain (cargo audit) |
-| F | ErrorCode coverage |
+| Job | Purpose | Status |
+|-----|---------|--------|
+| A | Rust hygiene (fmt, clippy) | Done |
+| B | Run tests | Done |
+| C | Build Linux musl static | Done |
+| D | Build macOS ARM64 | Done |
+| E | Build Windows x86_64 | Done |
+| F | Supply chain (cargo audit) | Done |
+| G | ErrorCode coverage | Done |
+| H | Metadata drift detection | Done |
+
+### Future CI Enhancements
+- [ ] Conformance (full corpus against Lean oracle)
+- [ ] Cross-platform replay (verify identical output)
 
 ---
 

@@ -1,6 +1,6 @@
 # Makefile for Jolt Oracle Rust implementation
 
-.PHONY: all build test clean release release-musl release-dist fmt clippy check audit help
+.PHONY: all build test clean release release-musl release-dist fmt clippy check audit metadata-drift help
 
 # Default target
 all: build
@@ -58,6 +58,14 @@ error-coverage:
 error-coverage-verbose:
 	./scripts/check-error-coverage.sh --verbose
 
+# Check metadata drift
+metadata-drift:
+	./scripts/check-metadata-drift.sh
+
+# Check metadata drift (verbose)
+metadata-drift-verbose:
+	./scripts/check-metadata-drift.sh --verbose
+
 # Install musl target (run once)
 install-musl-target:
 	rustup target add x86_64-unknown-linux-musl
@@ -94,6 +102,7 @@ help:
 	@echo "  check          - Run fmt, clippy, and tests"
 	@echo "  audit          - Run cargo audit"
 	@echo "  error-coverage - Check error code test coverage"
+	@echo "  metadata-drift - Check metadata.json drift"
 	@echo "  clean          - Clean build artifacts"
 	@echo ""
 	@echo "Setup targets:"

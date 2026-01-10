@@ -5,11 +5,13 @@ on:
     branches: [master, main]
     paths:
       - 'jolt-oracle-rs/**'
+      - 'jolt_oracle/metadata.json'
       - '.github/workflows/rust.yml'
   pull_request:
     branches: [master, main]
     paths:
       - 'jolt-oracle-rs/**'
+      - 'jolt_oracle/metadata.json'
       - '.github/workflows/rust.yml'
   workflow_dispatch:
 
@@ -147,4 +149,20 @@ jobs:
         run: |
           chmod +x scripts/check-error-coverage.sh
           ./scripts/check-error-coverage.sh --verbose
+        working-directory: jolt-oracle-rs
+
+  # Job H: Metadata drift detection
+  metadata-drift:
+    name: Metadata Drift
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Check metadata drift
+        run: |
+          chmod +x scripts/check-metadata-drift.sh
+          ./scripts/check-metadata-drift.sh --verbose
         working-directory: jolt-oracle-rs
