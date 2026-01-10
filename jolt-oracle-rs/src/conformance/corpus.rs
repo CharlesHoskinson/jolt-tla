@@ -13,9 +13,8 @@
 use crate::error::ErrorCode;
 use crate::field::Fr;
 use crate::json::parse as parse_json;
-use crate::poseidon::{permute, Poseidon};
+use crate::poseidon::{hash, permute};
 use serde::Deserialize;
-use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 
@@ -53,18 +52,11 @@ pub enum TestResult {
     /// Test passed.
     Pass,
     /// Test failed with mismatch.
-    Fail {
-        expected: String,
-        actual: String,
-    },
+    Fail { expected: String, actual: String },
     /// Test was skipped (operation not implemented).
-    Skip {
-        reason: String,
-    },
+    Skip { reason: String },
     /// Test errored during execution.
-    Error {
-        message: String,
-    },
+    Error { message: String },
 }
 
 impl TestResult {
@@ -113,7 +105,11 @@ impl CorpusResults {
     pub fn summary(&self) -> String {
         format!(
             "{} passed, {} failed, {} skipped, {} errors (total: {})",
-            self.passed, self.failed, self.skipped, self.errors, self.total()
+            self.passed,
+            self.failed,
+            self.skipped,
+            self.errors,
+            self.total()
         )
     }
 
@@ -218,7 +214,10 @@ impl CorpusRunner {
             arr.copy_from_slice(&bytes);
             Fr::from_bytes_le(&arr)
         } else {
-            Err(ErrorCode::E104_WrongLength(bytes.len() as u64, 32))
+            Err(ErrorCode::E104_WrongLength(
+                "32".to_string(),
+                bytes.len() as u64,
+            ))
         };
 
         // Check expected
@@ -250,7 +249,8 @@ impl CorpusRunner {
                     actual: format!("ok: {}", fr_to_decimal(&fr)),
                 },
                 Err(e) => {
-                    let expected_code = err.get("code").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                    let expected_code =
+                        err.get("code").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                     let actual_code = e.code();
                     if actual_code == expected_code {
                         TestResult::Pass
@@ -375,15 +375,13 @@ impl CorpusRunner {
 
     /// Run poseidon_params test.
     fn run_poseidon_params(&self, vector: &TestVector) -> TestResult {
-        use crate::poseidon::params::{FULL_ROUNDS, PARTIAL_ROUNDS, RATE, WIDTH};
+        use crate::poseidon::{FULL_ROUNDS, PARTIAL_ROUNDS, RATE, WIDTH};
 
         if let Some(ok) = vector.expected.get("ok") {
             let expected_width = ok.get("width").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
             let expected_rate = ok.get("rate").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
-            let expected_full = ok
-                .get("full_rounds")
-                .and_then(|v| v.as_u64())
-                .unwrap_or(0) as usize;
+            let expected_full =
+                ok.get("full_rounds").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
             let expected_partial = ok
                 .get("partial_rounds")
                 .and_then(|v| v.as_u64())
@@ -442,11 +440,7 @@ impl CorpusRunner {
         }
 
         // Hash using Poseidon
-        let mut hasher = Poseidon::new();
-        for fr in &frs {
-            hasher.absorb(fr);
-        }
-        let result = hasher.squeeze();
+        let result = hash(&frs);
         let result_hex = hex::encode(result.to_bytes_le());
 
         if let Some(ok) = vector.expected.get("ok") {
@@ -483,11 +477,14 @@ impl CorpusRunner {
 
         if initial_state.len() != 3 {
             return TestResult::Error {
-                message: format!("initial_state must have 3 elements, got {}", initial_state.len()),
+                message: format!(
+                    "initial_state must have 3 elements, got {}",
+                    initial_state.len()
+                ),
             };
         }
 
-        let mut state = [Fr::zero(); 3];
+        let mut state = [Fr::ZERO; 3];
         for (i, elem) in initial_state.iter().enumerate() {
             let hex = match elem.as_str() {
                 Some(h) => h,
@@ -504,7 +501,7 @@ impl CorpusRunner {
         }
 
         // Run permutation
-        permute(&mut state);
+        state = permute(&state);
 
         // Compare final state
         if let Some(ok) = vector.expected.get("ok") {
@@ -575,7 +572,8 @@ impl CorpusRunner {
                     actual: "ok".to_string(),
                 },
                 Err(e) => {
-                    let expected_code = err.get("code").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                    let expected_code =
+                        err.get("code").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                     let actual_code = e.code();
                     if actual_code == expected_code {
                         TestResult::Pass
@@ -616,7 +614,8 @@ impl CorpusRunner {
                 },
                 Err(_) => {
                     // Hex decode error maps to E103
-                    let expected_code = err.get("code").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                    let expected_code =
+                        err.get("code").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
                     if expected_code == 103 {
                         TestResult::Pass
                     } else {

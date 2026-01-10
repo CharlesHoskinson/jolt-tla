@@ -112,10 +112,7 @@ fn test_corpus_fr_canonical() {
 
     println!("Fr tests: {} total", fr_tests.len());
 
-    let passed: Vec<_> = fr_tests
-        .iter()
-        .filter(|(_, r)| r.is_pass())
-        .collect();
+    let passed: Vec<_> = fr_tests.iter().filter(|(_, r)| r.is_pass()).collect();
 
     println!("Fr tests passed: {}", passed.len());
 
@@ -149,10 +146,7 @@ fn test_corpus_poseidon() {
 
     println!("Poseidon tests: {} total", poseidon_tests.len());
 
-    let passed: Vec<_> = poseidon_tests
-        .iter()
-        .filter(|(_, r)| r.is_pass())
-        .collect();
+    let passed: Vec<_> = poseidon_tests.iter().filter(|(_, r)| r.is_pass()).collect();
 
     println!("Poseidon tests passed: {}", passed.len());
 
@@ -186,10 +180,7 @@ fn test_corpus_negative_cases() {
 
     println!("Negative tests: {} total", negative_tests.len());
 
-    let passed: Vec<_> = negative_tests
-        .iter()
-        .filter(|(_, r)| r.is_pass())
-        .collect();
+    let passed: Vec<_> = negative_tests.iter().filter(|(_, r)| r.is_pass()).collect();
 
     println!("Negative tests passed: {}", passed.len());
 
