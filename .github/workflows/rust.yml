@@ -259,12 +259,25 @@ jobs:
           path: replay-results/
 
       - name: List downloaded files
-        run: ls -la replay-results/
+        run: |
+          echo "=== Directory structure ==="
+          ls -la
+          echo "=== Replay results ==="
+          ls -la replay-results/ || echo "replay-results/ not found"
+          find . -name "replay-*.json" -type f 2>/dev/null || echo "No replay JSON files found"
 
       - name: Compare cross-platform outputs
         run: |
           chmod +x jolt-oracle-rs/scripts/compare-replay-outputs.sh
-          jolt-oracle-rs/scripts/compare-replay-outputs.sh \
-            replay-results/replay-linux.json \
-            replay-results/replay-macos.json \
-            replay-results/replay-windows.json
+          # Find the actual files (download-artifact may use different paths)
+          LINUX=$(find . -name "replay-linux.json" -type f | head -1)
+          MACOS=$(find . -name "replay-macos.json" -type f | head -1)
+          WINDOWS=$(find . -name "replay-windows.json" -type f | head -1)
+          echo "Linux: $LINUX"
+          echo "macOS: $MACOS"
+          echo "Windows: $WINDOWS"
+          if [[ -z "$LINUX" || -z "$MACOS" || -z "$WINDOWS" ]]; then
+            echo "ERROR: Missing replay result files"
+            exit 1
+          fi
+          jolt-oracle-rs/scripts/compare-replay-outputs.sh "$LINUX" "$MACOS" "$WINDOWS"
