@@ -106,6 +106,17 @@
   - [x] Makefile target `metadata-drift`
   - [x] Validates metadata.json structure and Poseidon parameters
   - [x] Verifies BLS12-381 modulus, error code count, round constants
+- [x] Corpus conformance testing in CI
+  - [x] `src/conformance/corpus.rs` - Corpus runner implementation
+  - [x] `tests/corpus_conformance.rs` - Integration tests
+  - [x] CI job in rust.yml workflow
+  - [x] Runs all vectors from corpus.json against Rust implementation
+- [x] Cross-platform replay testing in CI
+  - [x] `tests/fixtures/replay/` - Test input fixtures
+  - [x] `scripts/run-replay-tests.sh` - Runs oracle on fixtures
+  - [x] `scripts/compare-replay-outputs.sh` - Compares outputs
+  - [x] CI job in rust.yml workflow
+  - [x] Verifies Linux, macOS, Windows produce identical digests
 
 ---
 
@@ -121,10 +132,11 @@
 | F | Supply chain (cargo audit) | Done |
 | G | ErrorCode coverage | Done |
 | H | Metadata drift detection | Done |
+| I | Corpus conformance | Done |
+| J | Cross-platform replay | Done |
 
 ### Future CI Enhancements
-- [ ] Conformance (full corpus against Lean oracle)
-- [ ] Cross-platform replay (verify identical output)
+- [ ] Conformance (full corpus against Lean oracle subprocess)
 
 ---
 
