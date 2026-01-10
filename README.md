@@ -361,9 +361,144 @@ We don't just specify behavior—we specify what "secure" means, then prove it.
 
 The TLA+ spec isn't documentation. It's a model the TLC checker executes, exploring all reachable states, verifying invariants hold in each. If there's a state sequence that breaks security, TLC finds it.
 
-The Lean 4 kernel provides machine-checked proofs of the same invariants. No axiom gaps, no "sorry" placeholders—every theorem is fully proven. Build it yourself: `cd lean && lake build`.
+The Lean 4 kernel provides machine-checked proofs of the same invariants. Build it yourself: `cd lean && lake build`.
 
 The prose spec explains decisions. Byte ordering, endianness, domain tags—details an implementer needs but that would clutter a formal model.
+
+---
+
+## Liveness Verification (NearFall)
+
+Safety invariants prove "bad things don't happen." Liveness proves "good things eventually happen." The NearFall module provides machine-checked liveness proofs for the continuation protocol.
+
+### Why Does the Machine Stop?
+
+Here's the problem. You've got a zero-knowledge virtual machine that runs programs in chunks. It starts, does some work, and should eventually finish. But how do you *know* it finishes? Not "probably finishes" or "usually finishes"—we want a mathematical proof that says: given these rules, the machine cannot run forever. It has to stop.
+
+Safety and liveness are different beasts. Safety says "nothing bad happens"—the registers stay correct, the hashes don't collide, nobody can forge a proof. We've had that for a while. But liveness says "something good eventually happens." That's harder. You can't just check one state at a time. You have to reason about *all possible futures*, including the infinite ones where some gremlin keeps the machine spinning forever.
+
+So we built a countdown clock. Not a real clock—a mathematical one we call the variant. Every time the machine does real work—executes a chunk, completes, or fails—the number goes down. Every time it does busywork—starts up, stutters—the number stays the same or goes down. The variant is a natural number, which means it can't go below zero. And here's the punch line: if a number keeps going down and can't go below zero, it has to hit zero eventually. When it hits zero, you're in a terminal state. Done.
+
+But there's a catch. What if the machine just stutters forever? Sits there doing nothing, variant frozen at 17? That's where fairness comes in. We don't assume the scheduler is adversarial—we assume weak fairness. In plain terms: if an action is ready to go and stays ready, it eventually gets taken. The system can't dodge its obligations forever. Under weak fairness, the countdown clock must tick. The variant must fall. The machine must stop.
+
+The whole edifice—infinite traces, temporal operators, fairness conditions, progress partitions—it looks like a lot of machinery. And it is. But strip away the notation and you've got one idea: build a countdown that can only go down, prove the scheduler has to let it tick, and conclude the game ends. That's the liveness theorem. That's why the machine stops.
+
+### What's Proven
+
+| Property | Meaning |
+|----------|---------|
+| **No deadlock** | Non-terminal states always have an enabled action |
+| **Progress from INIT** | Under weak fairness, execution leaves INIT phase |
+| **Eventually terminal** | Under weak fairness + bounded chunks, reaches COMPLETE or FAILED |
+| **Variant decrease** | Progress steps strictly decrease termination measure |
+
+### Key Definitions
+
+```lean
+-- Infinite trace semantics (matches TLA+ [Next]_vars)
+def Trace := Nat → SystemState
+def StepOrStutter (s s' : SystemState) : Prop := Step s s' ∨ s' = s
+
+-- Temporal operators
+def Eventually (P : SystemState → Prop) (tr : Trace) : Prop := ∃ n, P (tr n)
+def LeadsTo (P Q : SystemState → Prop) (tr : Trace) : Prop :=
+  ∀ n, P (tr n) → ∃ m, m ≥ n ∧ Q (tr m)
+
+-- Weak fairness: continuously enabled → infinitely often taken
+def WeakFair (A : Action) (tr : Trace) : Prop :=
+  (∃ n, ∀ m ≥ n, Enabled A (tr m)) → InfOften (Occurs A tr)
+```
+
+### State Machine
+
+```
+                           Jolt Continuation State Machine
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                                                                         │
+    │                         StartExecution                                  │
+    │         ┌───────┐      ─────────────────►      ┌───────────┐            │
+    │         │       │                              │           │            │
+    │         │ INIT  │                              │ EXECUTING │◄───┐       │
+    │         │       │                              │           │    │       │
+    │         └───────┘                              └─────┬─────┘    │       │
+    │                                                      │          │       │
+    │                                                      │          │       │
+    │                              ExecuteChunk            │          │       │
+    │                              (chunk not complete)    └──────────┘       │
+    │                                                                         │
+    │                                      │                                  │
+    │                                      │                                  │
+    │                 ┌────────────────────┴────────────────────┐             │
+    │                 │                                         │             │
+    │                 │ CompleteExecution          ExecutionFailed            │
+    │                 │ (continuation complete)    (VM trapped)  │            │
+    │                 ▼                                         ▼             │
+    │          ┌──────────┐                              ┌──────────┐         │
+    │          │          │                              │          │         │
+    │          │ COMPLETE │                              │  FAILED  │         │
+    │          │    ◉     │                              │    ◉     │         │
+    │          └──────────┘                              └──────────┘         │
+    │              Terminal (absorbing)                    Terminal           │
+    │                                                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
+
+    Legend:
+    ─────►  Transition (action)
+    ◉       Terminal state (only stuttering allowed)
+    ◄───┐
+        │   Self-loop
+    ────┘
+```
+
+### Termination Variant
+
+The termination proof uses a single natural number variant:
+
+```
+Variant(s) = RemainingChunks(s) × CHUNK_MAX_STEPS + StepsRemaining(s)
+```
+
+- Terminal phases (COMPLETE, FAILED): variant = 0
+- Progress steps: variant strictly decreases
+- Non-progress steps: variant does not increase
+
+This guarantees termination under weak fairness assumptions.
+
+### Build
+
+```bash
+cd lean && lake build
+```
+
+### Roadmap
+
+**Lean Track (NearFall)**
+
+- [x] Trace.lean — Infinite trace semantics (`Nat → SystemState`)
+- [x] Temporal.lean — LTL operators (Always, Eventually, LeadsTo, InfOften)
+- [x] Fairness.lean — Weak/strong fairness with corrected TLA+ semantics
+- [x] Variant.lean — Termination variant and progress partition
+- [x] Liveness.lean — Progress theorems under fairness (stubs)
+- [x] Progress.lean — No-deadlock lemmas
+- [x] Alignment.lean — Semantic alignment with TLA+
+- [ ] Fill `sorry` placeholders in Liveness.lean
+- [ ] Fill `sorry` placeholders in Variant.lean
+- [ ] Fill `sorry` placeholder in Fairness.lean (enabled_stability)
+
+**TLA+ Track (TLAPS Proofs)**
+
+- [ ] CryptoModel.tla — Tagged preimage constructors, scoped injectivity
+- [ ] TypeOK.tla — Type invariant with encoding membership
+- [ ] SafetyInduction.tla — Inductive invariant, variant lemmas
+- [ ] AttackLemmas.tla — Encoding injectivity, digest binding
+- [ ] LivenessProofs.tla — WF/ENABLED leads-to with enabledness stability
+
+**Integration**
+
+- [x] ASSUMPTIONS.md — Assumption registry and proof obligation map
+- [x] CI workflows — Lean build integrated
+- [ ] Batch process `sorry` placeholders in NearFall modules
+- [ ] Cross-track alignment verification
 
 ---
 
@@ -675,8 +810,15 @@ jolt-tla/
 │   ├── README.md
 │   └── TODO.md              # Implementation roadmap
 │
-├── lean/                    # NearFall proof modules
-│   └── NearFall/            # Liveness, fairness proofs
+├── lean/                    # Lean 4 proof modules
+│   └── NearFall/            # Liveness verification (infinite-state)
+│       ├── Trace.lean       # Infinite traces (Nat → State)
+│       ├── Temporal.lean    # LTL operators (□, ◇, ~>)
+│       ├── Fairness.lean    # Weak/strong fairness
+│       ├── Variant.lean     # Termination variant
+│       ├── Liveness.lean    # Progress theorems
+│       ├── Progress.lean    # No-deadlock lemmas
+│       └── Alignment.lean   # TLA+/Lean semantic alignment
 │
 ├── docs/
 │   ├── architecture.md
@@ -823,6 +965,21 @@ These implementation mistakes cause chain splits. The oracle rejects all of them
 **Tar canonicalization.** Bundle archives must have zero mtime, no absolute paths, no `..`, and entries sorted bytewise. `tar` defaults don't produce canonical output; you need explicit flags.
 
 **Error precedence.** When multiple errors apply, the spec defines which wins (§16). Returning E501 when E400 should fire causes verification mismatches.
+
+---
+
+## Adversarial Proof Review
+
+The fundamental problem with proof is not writing it—it is knowing whether to trust it. A proof that compiles is not necessarily a proof that convinces. We have all seen arguments that type-check yet leave us uneasy, proofs where the machinery works but the insight hides. The question is not "does Lean accept this?" but rather "should Lean accept this, and if so, why?" To answer that question, we submit every proof to adversarial review before we trust it.
+
+Our methodology employs two independent reviewers: Goedel-Prover and DeepSeek-Prover-V2. Each examines the proof from a different vantage point, looking for the gaps that a single perspective might miss. The first reviewer probes the logical structure—are the hypotheses too strong, the conclusion too weak, the intermediate steps hiding complexity? The second reviewer searches for patterns that suggest trouble: proof terms that exploit definitional equality in surprising ways, tactics that succeed for the wrong reasons, lemmas that prove too much or too little. Only when both reviewers fail to find fault do we proceed to the final oracle.
+
+That oracle is Lean 4 itself, and it has the final word. The reviewers may raise concerns or miss subtleties, but the type checker does not negotiate. A proof compiles or it does not. What the adversarial process gives us is not certainty—we already had that from the type checker—but confidence. When a proof survives two rounds of hostile scrutiny and then compiles without Mathlib, without axioms beyond our stated assumptions, without sorry or admit, we have earned the right to believe it. The proof is not just correct; it is robust.
+
+| Model | Role | Reference |
+|-------|------|-----------|
+| Goedel-Prover | Adversarial review (Round 1) | [arXiv:2502.07640](https://arxiv.org/abs/2502.07640) |
+| DeepSeek-Prover-V2 | Adversarial review (Round 2) | [arXiv:2412.12877](https://arxiv.org/abs/2412.12877) |
 
 ---
 

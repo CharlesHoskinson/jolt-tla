@@ -225,3 +225,70 @@ jobs:
           echo "=== Constants Alignment Check ==="
           python3 scripts/check_alignment.py
 
+  proof-modules:
+    name: Parse Proof Modules
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Download TLA+ tools
+        run: |
+          curl -fsSL -o tla2tools.jar "$TLAPLUS_JAR_URL"
+          ACTUAL_SHA256=$(sha256sum tla2tools.jar | cut -d' ' -f1)
+          if [ "$ACTUAL_SHA256" != "$TLAPLUS_JAR_SHA256" ]; then
+            echo "ERROR: Checksum mismatch!"
+            exit 1
+          fi
+
+      - name: Parse proof modules (SANY)
+        run: |
+          echo "=== Parsing Proof Modules ===" | tee proof-modules.log
+          echo "" >> proof-modules.log
+
+          PROOF_MODULES="CryptoModel TypeOK SafetyInduction AttackLemmas LivenessProofs"
+          for module in $PROOF_MODULES; do
+            echo "Parsing tla/proofs/$module.tla..." | tee -a proof-modules.log
+            if [ -f "tla/proofs/$module.tla" ]; then
+              java -cp tla2tools.jar tla2sany.SANY "tla/proofs/$module.tla" 2>&1 | tee -a proof-modules.log
+              echo "" >> proof-modules.log
+            else
+              echo "WARNING: tla/proofs/$module.tla not found" | tee -a proof-modules.log
+            fi
+          done
+
+      - name: Generate proof obligation summary
+        run: |
+          echo "=== Proof Obligation Summary ===" | tee -a proof-modules.log
+          echo "" >> proof-modules.log
+
+          # Count THEOREM and LEMMA declarations
+          echo "Theorems and Lemmas by module:" >> proof-modules.log
+          for file in tla/proofs/*.tla; do
+            if [ -f "$file" ]; then
+              THEOREM_COUNT=$(grep -cE "^(THEOREM|LEMMA)" "$file" 2>/dev/null || echo "0")
+              echo "$(basename $file): $THEOREM_COUNT theorems/lemmas" >> proof-modules.log
+            fi
+          done
+
+          echo "" >> proof-modules.log
+          echo "Total theorems/lemmas:" >> proof-modules.log
+          grep -rE "^(THEOREM|LEMMA)" tla/proofs/*.tla 2>/dev/null | wc -l >> proof-modules.log
+
+          cat proof-modules.log
+
+      - name: Upload proof module output
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: proof-modules-output
+          path: proof-modules.log
+          retention-days: 90
+
