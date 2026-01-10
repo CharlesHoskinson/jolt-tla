@@ -17,7 +17,7 @@ lean_lib CLI where
              `CLI.Schema.ChainInput, `CLI.Schema.TestVector, `CLI.Commands.Digest,
              `CLI.Commands.Verify, `CLI.Commands.VerifyVectors, `CLI.Commands.Generate,
              `CLI.Commands.Status, `CLI.Commands.Explain, `CLI.Commands.Diff,
-             `CLI.Commands.Watch, `CLI.Format.Json,
+             `CLI.Commands.Watch, `CLI.Commands.ExportMetadata, `CLI.Commands.GenerateCorpus, `CLI.Format.Json,
              `CLI.REPL.Types, `CLI.REPL.UI, `CLI.REPL.Errors, `CLI.REPL.Lexer,
              `CLI.REPL.Parser, `CLI.REPL.Eval, `CLI.REPL.Loop]
 

@@ -7,6 +7,8 @@ import CLI.Commands.Status
 import CLI.Commands.Explain
 import CLI.Commands.Diff
 import CLI.Commands.Watch
+import CLI.Commands.ExportMetadata
+import CLI.Commands.GenerateCorpus
 import CLI.REPL.Loop
 import CLI.REPL.Eval
 
@@ -45,6 +47,8 @@ def printUsage : IO Unit := do
   IO.println "    --interval=N                Refresh interval in seconds (default: 2)"
   IO.println "    --count=N                   Number of iterations (default: 30)"
   IO.println "    --quiet, -q                 Suppress startup message"
+  IO.println "  export-metadata               Export metadata JSON for Rust codegen"
+  IO.println "  generate-corpus               Generate conformance test corpus"
   IO.println "  version                       Show version"
   IO.println ""
   IO.println "REPL Batch Mode:"
@@ -132,6 +136,10 @@ def batchMain (opts : BatchOpts) : IO UInt32 := do
 /-- Main entry point. -/
 def main (args : List String) : IO UInt32 := do
   match args with
+  | ["export-metadata"] =>
+    exportMetadataMain []
+  | ["generate-corpus"] =>
+    generateCorpusMain []
   | ["version"] =>
     printVersion
     return 0

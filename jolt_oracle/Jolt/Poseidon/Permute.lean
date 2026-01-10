@@ -66,4 +66,36 @@ def permute (cfg : Config) (state : Array Fr) : Array Fr := Id.run do
 
   return st
 
+/-- Poseidon permutation with trace output for debugging.
+
+Returns (final_state, round_traces) where each trace entry contains
+the state after that round. Useful for divergence localization when
+comparing with Rust implementation (POS-006). -/
+def permuteWithTrace (cfg : Config) (state : Array Fr) : (Array Fr × Array (Array Fr)) := Id.run do
+  if state.size != cfg.width then return (state, #[])
+  let halfFull := cfg.fullRounds / 2
+  let mut st := state
+  let mut round := 0
+  let mut traces : Array (Array Fr) := #[]
+
+  -- First half of full rounds
+  for _ in [:halfFull] do
+    st := fullRound cfg st round
+    traces := traces.push st
+    round := round + 1
+
+  -- Partial rounds
+  for _ in [:cfg.partialRounds] do
+    st := partialRound cfg st round
+    traces := traces.push st
+    round := round + 1
+
+  -- Second half of full rounds
+  for _ in [:halfFull] do
+    st := fullRound cfg st round
+    traces := traces.push st
+    round := round + 1
+
+  return (st, traces)
+
 end Jolt.Poseidon

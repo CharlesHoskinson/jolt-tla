@@ -355,7 +355,8 @@ We don't just specify behavior—we specify what "secure" means, then prove it.
 | Layer | What It Is | Who It's For |
 |-------|-----------|--------------|
 | `tla/MC_Jolt.tla` | Modular TLA+ spec (19 modules, canonical) | Auditors, verification engineers |
-| `lean/` | Machine-checked Lean 4 kernel + Oracle CLI (~8K lines) | Formal verification, production |
+| `jolt_oracle/` | Machine-checked Lean 4 kernel + Oracle CLI (~8K lines) | Formal verification, specification |
+| `jolt-oracle-rs/` | Rust implementation (conformance-tested against Lean) | Production deployment |
 | `spec.md` | Prose specification (~40K words) | Implementers, researchers |
 
 The TLA+ spec isn't documentation. It's a model the TLC checker executes, exploring all reachable states, verifying invariants hold in each. If there's a state sequence that breaks security, TLC finds it.
@@ -642,7 +643,7 @@ jolt-tla/
 │   ├── Invariants.tla       # All 30 invariants
 │   └── MC_Jolt.tla          # Model check harness (canonical)
 │
-├── lean/                    # Lean 4 executable spec
+├── jolt_oracle/             # Lean 4 executable spec (canonical)
 │   ├── Jolt/                # Core modules
 │   │   ├── Encoding/        # Bytes32, Fr2
 │   │   ├── Field/           # Fr arithmetic
@@ -653,12 +654,29 @@ jolt-tla/
 │   │   ├── Transcript/      # Fiat-Shamir sponge
 │   │   └── Wrapper/         # Public inputs
 │   ├── CLI/                 # Oracle CLI
-│   │   ├── Commands/        # digest, verify, etc.
+│   │   ├── Commands/        # digest, verify, export-metadata, generate-corpus
 │   │   └── REPL/            # Interactive mode
-│   ├── NearFall/            # Proof modules
 │   ├── Jolt.lean            # Library root
 │   ├── lakefile.lean        # Build config
-│   └── README.md
+│   └── metadata.json        # Exported constants for Rust codegen
+│
+├── jolt-oracle-rs/          # Rust implementation (conformance-tested)
+│   ├── Cargo.toml           # Project configuration
+│   ├── build.rs             # Codegen from Lean metadata.json
+│   ├── src/
+│   │   ├── lib.rs           # Library root
+│   │   ├── main.rs          # CLI binary
+│   │   ├── error.rs         # ErrorCode (uses codegen)
+│   │   ├── runner.rs        # LeanRunner subprocess backend
+│   │   ├── field/           # Fr (BLS12-381 scalar)
+│   │   ├── poseidon/        # Permutation + sponge
+│   │   ├── state/           # VMState, Digest (planned)
+│   │   └── json/            # I-JSON, JCS (planned)
+│   ├── README.md
+│   └── TODO.md              # Implementation roadmap
+│
+├── lean/                    # NearFall proof modules
+│   └── NearFall/            # Liveness, fairness proofs
 │
 ├── docs/
 │   ├── architecture.md
@@ -759,6 +777,26 @@ jolt> set field value   # Modify state fields
 jolt> show              # Display current state
 jolt> quit              # Exit REPL
 ```
+
+---
+
+## Rust Oracle (jolt-oracle-rs/)
+
+Two implementations of the same specification will eventually disagree. One team serializes JSON keys alphabetically; another preserves insertion order. Both choices seem reasonable, and both pass their own tests. When these implementations meet on a live network, one node accepts a block the other rejects. The chain forks. The Lean oracle exists to prevent this. Give it a state and it returns the one correct digest. There is no room for interpretation. Correctness is not a debate—it is a function call.
+
+Lean defines truth, but it cannot ship. Production systems are native binaries written in Rust or C or Go. They run without interpreters. Lean requires its own toolchain, and embedding it in a blockchain node or hardware wallet creates friction. The obvious alternative—rewrite everything in Rust from scratch—reintroduces the original problem. The specification says "serialize the state," but does that mean big-endian or little-endian? Two careful teams reading the same prose will eventually choose differently on some edge case.
+
+So we take a different path. Lean remains the canonical specification, the referee that settles disputes. The Rust implementation must match it byte for byte. The build system reads error codes and cryptographic constants directly from Lean exports, so parameters cannot drift. During testing, a subprocess invokes the Lean oracle and compares outputs. Any divergence means the Rust code is wrong. The oracle stays authoritative. Rust becomes a verified replacement—fast enough for production, correct because it matches the spec exactly.
+
+### Build
+
+```bash
+cd jolt-oracle-rs
+cargo build --release
+cargo test
+```
+
+See `jolt-oracle-rs/TODO.md` for the implementation roadmap.
 
 ---
 

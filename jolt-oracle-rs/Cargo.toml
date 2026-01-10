@@ -1,0 +1,56 @@
+[package]
+name = "jolt-oracle"
+version = "0.1.0"
+edition = "2021"
+description = "Rust implementation of the Jolt Oracle specification"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/CharlesHoskinson/jolt-tla"
+
+[lib]
+name = "jolt_oracle"
+path = "src/lib.rs"
+
+[[bin]]
+name = "oracle"
+path = "src/main.rs"
+
+[dependencies]
+# BLS12-381 scalar field (Fr)
+bls12_381 = "0.8"
+ff = "0.13"
+
+# Error handling
+thiserror = "1.0"
+
+# CLI
+clap = { version = "4.4", features = ["derive"] }
+
+# Serialization (for test vectors)
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Hex encoding
+hex = "0.4"
+
+[build-dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+# For conformance testing
+tempfile = "3.10"
+
+[features]
+default = []
+# Enable trace output for debugging
+trace = []
+
+[profile.release]
+lto = true
+codegen-units = 1
+
+# Lints for consensus-critical code
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
