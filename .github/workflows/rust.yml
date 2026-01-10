@@ -166,3 +166,17 @@ jobs:
           chmod +x scripts/check-metadata-drift.sh
           ./scripts/check-metadata-drift.sh --verbose
         working-directory: jolt-oracle-rs
+
+  # Job I: Corpus conformance tests
+  corpus-conformance:
+    name: Corpus Conformance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run corpus conformance tests
+        run: cargo test --test corpus_conformance -- --nocapture
+        working-directory: jolt-oracle-rs

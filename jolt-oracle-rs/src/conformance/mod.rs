@@ -9,10 +9,12 @@
 //! - CONF-003: Emit repro bundle on mismatch
 //! - QG-1: Conformance guarantee
 
+pub mod corpus;
 mod harness;
 mod repro;
 mod runner;
 
+pub use corpus::{Corpus, CorpusResults, CorpusRunner, TestResult, TestVector};
 pub use harness::{BatchResult, DiffResult, DiffTestHarness};
 pub use repro::ReproBundle;
 pub use runner::{LeanDigestRunner, OracleOutput, OracleRunner, RustDigestRunner};
