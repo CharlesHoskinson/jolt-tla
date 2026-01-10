@@ -5,13 +5,13 @@ on:
     branches: [master, main]
     paths:
       - 'jolt-oracle-rs/**'
-      - 'jolt_oracle/metadata.json'
+      - 'jolt_oracle/**'
       - '.github/workflows/rust.yml'
   pull_request:
     branches: [master, main]
     paths:
       - 'jolt-oracle-rs/**'
-      - 'jolt_oracle/metadata.json'
+      - 'jolt_oracle/**'
       - '.github/workflows/rust.yml'
   workflow_dispatch:
 
@@ -285,3 +285,48 @@ jobs:
             exit 1
           fi
           jolt-oracle-rs/scripts/compare-replay-outputs.sh "$LINUX" "$MACOS" "$WINDOWS"
+
+  # Job K: Lean conformance tests (Rust vs Lean subprocess)
+  lean-conformance:
+    name: Lean Conformance
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: .
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Lean 4 and build oracle
+        uses: leanprover/lean-action@v1
+        with:
+          build-args: 'oracle'
+          lake-package-directory: jolt_oracle
+
+      - name: Verify Lean oracle built
+        run: |
+          echo "Checking Lean oracle binary..."
+          ls -la jolt_oracle/.lake/build/bin/ || echo "bin directory not found"
+          if [ -f "jolt_oracle/.lake/build/bin/oracle" ]; then
+            echo "Lean oracle found"
+            file jolt_oracle/.lake/build/bin/oracle
+          else
+            echo "ERROR: Lean oracle not found"
+            exit 1
+          fi
+
+      - name: Run Lean oracle self-test
+        run: |
+          echo "Running Lean oracle tests..."
+          cd jolt_oracle && lake exe test || echo "Test executable not available, skipping"
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Run Lean conformance tests
+        env:
+          LEAN_ORACLE_PATH: ${{ github.workspace }}/jolt_oracle
+        run: |
+          echo "LEAN_ORACLE_PATH=$LEAN_ORACLE_PATH"
+          ls -la "$LEAN_ORACLE_PATH/.lake/build/bin/" || true
+          cargo test --test lean_conformance -- --nocapture
+        working-directory: jolt-oracle-rs

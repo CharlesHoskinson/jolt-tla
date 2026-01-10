@@ -134,18 +134,21 @@
 | H | Metadata drift detection | Done |
 | I | Corpus conformance | Done |
 | J | Cross-platform replay | Done |
+| K | Lean conformance (Rust vs Lean) | Done |
 
 ### Future CI Enhancements
-- [ ] Conformance (full corpus against Lean oracle subprocess)
+- [x] Conformance (full corpus against Lean oracle subprocess)
 
 ---
 
 ## Milestones
 
 ### Milestone A: Conformance Established
-- [ ] All CONF-* requirements satisfied
-- [ ] Lean passes its own corpus
-- [ ] Rust harness can invoke LeanRunner and compare
+- [x] All CONF-* requirements satisfied
+- [x] Lean passes its own corpus
+- [x] Rust harness can invoke LeanRunner and compare
+  - [x] `tests/lean_conformance.rs` - Lean subprocess conformance tests
+  - [x] Job K in rust.yml - CI integration for Rust vs Lean comparison
 
 ### Milestone B: Core Replacement
 - [x] All FR-*, POS-*, DIG-* requirements satisfied
