@@ -53,7 +53,7 @@ for fixture in "$FIXTURES_DIR"/digest_*.json; do
         echo "  Running: $name"
 
         # Run oracle and capture output
-        output=$("$ORACLE_BIN" digest --input "$fixture" 2>&1 || true)
+        output=$("$ORACLE_BIN" digest "$fixture" 2>&1 || true)
 
         # Escape for JSON
         escaped=$(echo "$output" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g' | tr '\n' ' ')
