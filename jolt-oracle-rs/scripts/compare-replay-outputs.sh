@@ -58,9 +58,9 @@ for file in "${@:2}"; do
     for test in $TEST_NAMES; do
         TOTAL_TESTS=$((TOTAL_TESTS + 1))
 
-        # Extract results
-        REF_RESULT=$(jq -r ".results[\"$test\"]" "$REFERENCE_FILE")
-        CMP_RESULT=$(jq -r ".results[\"$test\"]" "$file")
+        # Extract results and trim whitespace for comparison
+        REF_RESULT=$(jq -r ".results[\"$test\"]" "$REFERENCE_FILE" | xargs)
+        CMP_RESULT=$(jq -r ".results[\"$test\"]" "$file" | xargs)
 
         if [[ "$REF_RESULT" == "$CMP_RESULT" ]]; then
             echo -e "  ${GREEN}PASS${NC}: $test"
