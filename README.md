@@ -481,9 +481,9 @@ cd lean && lake build
 - [x] Liveness.lean — Progress theorems under fairness (stubs)
 - [x] Progress.lean — No-deadlock lemmas
 - [x] Alignment.lean — Semantic alignment with TLA+
-- [ ] Fill `sorry` placeholders in Liveness.lean
-- [ ] Fill `sorry` placeholders in Variant.lean
-- [ ] Fill `sorry` placeholder in Fairness.lean (enabled_stability)
+- [ ] Red Team: Fill `sorry` placeholders in Liveness.lean
+- [ ] Red Team: Fill `sorry` placeholders in Variant.lean
+- [ ] Red Team: Fill `sorry` placeholder in Fairness.lean (enabled_stability)
 
 **TLA+ Track (TLAPS Proofs)**
 
@@ -497,7 +497,7 @@ cd lean && lake build
 
 - [x] ASSUMPTIONS.md — Assumption registry and proof obligation map
 - [x] CI workflows — Lean build integrated
-- [ ] Batch process `sorry` placeholders in NearFall modules
+- [ ] Red Team batch processing on NearFall modules
 - [ ] Cross-track alignment verification
 
 ---
