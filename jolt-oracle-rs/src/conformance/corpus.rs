@@ -21,28 +21,41 @@ use std::path::Path;
 /// Corpus manifest with metadata.
 #[derive(Debug, Deserialize)]
 pub struct CorpusManifest {
+    /// Format version of the corpus file.
     pub format_version: String,
+    /// Lean version used to generate the corpus.
     pub lean_version: String,
+    /// Oracle version from metadata.
     pub oracle_version: String,
+    /// BLS12-381 modulus in decimal.
     pub modulus_decimal: String,
+    /// BLS12-381 modulus in hex.
     pub modulus_hex: String,
+    /// SHA-256 hash of round constants.
     pub round_constants_hash: String,
+    /// Corpus version.
     pub version: String,
 }
 
 /// A corpus containing test vectors.
 #[derive(Debug, Deserialize)]
 pub struct Corpus {
+    /// Corpus metadata.
     pub manifest: CorpusManifest,
+    /// List of test vectors.
     pub vectors: Vec<TestVector>,
 }
 
 /// A single test vector.
 #[derive(Debug, Deserialize)]
 pub struct TestVector {
+    /// Unique identifier for the test.
     pub id: String,
+    /// Operation to test (e.g., "fr_canonical", "poseidon_hash").
     pub op: String,
+    /// Input parameters for the operation.
     pub input: serde_json::Value,
+    /// Expected result (success or error).
     pub expected: serde_json::Value,
 }
 
@@ -60,10 +73,12 @@ pub enum TestResult {
 }
 
 impl TestResult {
+    /// Returns true if this is a passing result.
     pub fn is_pass(&self) -> bool {
         matches!(self, Self::Pass)
     }
 
+    /// Returns true if this is a failing result.
     pub fn is_fail(&self) -> bool {
         matches!(self, Self::Fail { .. })
     }
@@ -72,18 +87,25 @@ impl TestResult {
 /// Results from running the corpus.
 #[derive(Debug, Default)]
 pub struct CorpusResults {
+    /// Number of tests that passed.
     pub passed: usize,
+    /// Number of tests that failed.
     pub failed: usize,
+    /// Number of tests that were skipped.
     pub skipped: usize,
+    /// Number of tests that errored.
     pub errors: usize,
+    /// Detailed results for each test.
     pub details: Vec<(String, TestResult)>,
 }
 
 impl CorpusResults {
+    /// Create a new empty results container.
     pub fn new() -> Self {
         Self::default()
     }
 
+    /// Record a test result.
     pub fn record(&mut self, id: &str, result: TestResult) {
         match &result {
             TestResult::Pass => self.passed += 1,
@@ -94,14 +116,17 @@ impl CorpusResults {
         self.details.push((id.to_string(), result));
     }
 
+    /// Get total number of tests run.
     pub fn total(&self) -> usize {
         self.passed + self.failed + self.skipped + self.errors
     }
 
+    /// Returns true if all tests passed (no failures or errors).
     pub fn all_passed(&self) -> bool {
         self.failed == 0 && self.errors == 0
     }
 
+    /// Get a summary string of the results.
     pub fn summary(&self) -> String {
         format!(
             "{} passed, {} failed, {} skipped, {} errors (total: {})",
