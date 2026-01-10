@@ -13,7 +13,7 @@
 //! The rust.yml workflow Job K builds the Lean oracle and runs these tests
 //! with LEAN_ORACLE_PATH set automatically.
 
-use jolt_oracle::conformance::{DiffTestHarness, OracleOutput};
+use jolt_oracle::conformance::DiffTestHarness;
 use jolt_oracle::state::{Bytes32, VMStateV1};
 use std::env;
 
@@ -33,10 +33,12 @@ macro_rules! skip_if_no_lean {
 }
 
 /// Golden test vectors derived from the Lean specification.
+#[allow(dead_code)]
 struct GoldenVector {
     name: &'static str,
     program_hash: &'static str,
     state: VMStateV1,
+    /// Expected digest (reference only).
     expected_digest: &'static str,
 }
 

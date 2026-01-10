@@ -58,8 +58,18 @@ jobs:
         working-directory: lean
         run: |
           echo "Checking Alignment.lean for semantic integrity..."
-          if grep -n "sorry" NearFall/Alignment.lean 2>/dev/null; then
-            echo "ERROR: Alignment.lean contains sorry - semantic alignment broken"
+          # Check for 'sorry' as a tactic (not in comments or documentation)
+          # Exclude lines starting with /- or -- (comments) and common doc phrases
+          SORRY_LINES=$(grep -n '\bsorry\b' NearFall/Alignment.lean 2>/dev/null | \
+            grep -v '^\s*/[-!]' | \
+            grep -v '^\s*--' | \
+            grep -v 'without sorry' | \
+            grep -v 'has `sorry`' | \
+            grep -v 'see a sorry' | \
+            grep -v 'compile without sorry' || true)
+          if [ -n "$SORRY_LINES" ]; then
+            echo "ERROR: Alignment.lean contains sorry tactic - semantic alignment broken"
+            echo "$SORRY_LINES"
             exit 1
           fi
           echo "Alignment.lean passes semantic diff check"

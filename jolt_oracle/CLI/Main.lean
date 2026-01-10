@@ -148,6 +148,12 @@ def main (args : List String) : IO UInt32 := do
     return 0
   | ["digest", path] =>
     digestMain [path]
+  | ["digest", "--format=json", path] =>
+    digestMainJson [path]
+  | ["digest", "--format=plain", path] =>
+    digestMain [path]
+  | ["digest", "--format=pretty", path] =>
+    digestMainPretty [path]
   | ["verify", "chain", path] =>
     verifyChainMain [path]
   | ["verify", path] =>

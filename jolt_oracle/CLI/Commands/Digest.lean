@@ -194,7 +194,7 @@ where
       ]
       renderPlain doc
 
-/-- Main entry point for digest command. -/
+/-- Main entry point for digest command (plain format). -/
 def digestMain (args : List String) : IO UInt32 := do
   match args with
   | [filePath] =>
@@ -203,6 +203,28 @@ def digestMain (args : List String) : IO UInt32 := do
     return code.toUInt32
   | _ =>
     IO.println "Usage: oracle digest <state.json>"
+    return 4
+
+/-- Main entry point for digest command (JSON format). -/
+def digestMainJson (args : List String) : IO UInt32 := do
+  match args with
+  | [filePath] =>
+    let (code, output) ← runDigest filePath .json Caps.plain
+    IO.print output
+    return code.toUInt32
+  | _ =>
+    IO.println "Usage: oracle digest --format=json <state.json>"
+    return 4
+
+/-- Main entry point for digest command (pretty format). -/
+def digestMainPretty (args : List String) : IO UInt32 := do
+  match args with
+  | [filePath] =>
+    let (code, output) ← runDigest filePath .pretty Caps.plain
+    IO.print output
+    return code.toUInt32
+  | _ =>
+    IO.println "Usage: oracle digest --format=pretty <state.json>"
     return 4
 
 end CLI.Commands

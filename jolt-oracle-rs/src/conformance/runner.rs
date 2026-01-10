@@ -163,11 +163,11 @@ impl LeanDigestRunner {
     ) -> ConformanceResult<OracleOutput> {
         // Check for error in stderr or stdout
         if !success || stdout.contains("\"error\"") || stdout.contains("\"status\": \"INVALID\"") {
-            // Extract error code from JSON
-            if let Some(code) = extract_json_string(stdout, "\"error\":\"") {
+            // Extract error code from JSON (handles both "error":"..." and "error": "...")
+            if let Some(code) = extract_json_string(stdout, "\"error\":") {
                 return Ok(OracleOutput::Err(code));
             }
-            if let Some(code) = extract_json_string(stderr, "\"error\":\"") {
+            if let Some(code) = extract_json_string(stderr, "\"error\":") {
                 return Ok(OracleOutput::Err(code));
             }
             // Fall back to stderr content
@@ -179,8 +179,8 @@ impl LeanDigestRunner {
             ));
         }
 
-        // Extract digest from JSON output
-        if let Some(digest) = extract_json_string(stdout, "\"digest\":\"") {
+        // Extract digest from JSON output (handles both "digest":"..." and "digest": "...")
+        if let Some(digest) = extract_json_string(stdout, "\"digest\":") {
             return Ok(OracleOutput::Ok(digest));
         }
 
@@ -249,10 +249,17 @@ fn format_state_json(program_hash: &Bytes32, state: &VMStateV1) -> String {
     )
 }
 
-/// Extract a string value from JSON after a prefix.
-fn extract_json_string(s: &str, prefix: &str) -> Option<String> {
-    let start = s.find(prefix)? + prefix.len();
+/// Extract a string value from JSON after a key.
+fn extract_json_string(s: &str, key_prefix: &str) -> Option<String> {
+    let start = s.find(key_prefix)? + key_prefix.len();
     let remaining = &s[start..];
+    // Skip optional whitespace after the colon
+    let remaining = remaining.trim_start();
+    // Must start with a quote
+    if !remaining.starts_with('"') {
+        return None;
+    }
+    let remaining = &remaining[1..]; // skip opening quote
     let end = remaining.find('"')?;
     Some(remaining[..end].to_string())
 }
@@ -338,12 +345,24 @@ mod tests {
 
     #[test]
     fn test_extract_json_string() {
+        // Without space after colon
         let json = r#"{"digest":"12345"}"#;
-        let result = extract_json_string(json, "\"digest\":\"");
+        let result = extract_json_string(json, "\"digest\":");
         assert_eq!(result, Some("12345".to_string()));
 
+        // With space after colon (Lean style)
+        let json_with_space = r#"{"digest": "12345"}"#;
+        let result = extract_json_string(json_with_space, "\"digest\":");
+        assert_eq!(result, Some("12345".to_string()));
+
+        // Error without space
         let error_json = r#"{"error":"E404_InvalidHalted"}"#;
-        let result = extract_json_string(error_json, "\"error\":\"");
+        let result = extract_json_string(error_json, "\"error\":");
+        assert_eq!(result, Some("E404_InvalidHalted".to_string()));
+
+        // Error with space (Lean style)
+        let error_json_space = r#"{"error": "E404_InvalidHalted"}"#;
+        let result = extract_json_string(error_json_space, "\"error\":");
         assert_eq!(result, Some("E404_InvalidHalted".to_string()));
     }
 }
