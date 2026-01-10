@@ -16,6 +16,9 @@ states/
 .DS_Store
 Thumbs.db
 
+# Rust
+target/
+
 # Java
 *.class
 *.jar
