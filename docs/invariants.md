@@ -338,3 +338,91 @@ Model checking completed. No error has been found.
 ```
 
 If any invariant fails, TLC produces a counterexample trace showing exactly how the violation occurs.
+
+---
+
+## Attack Coverage Matrix
+
+This section provides an explicit mapping between attacker goals defined in the threat model and the formal invariants that prevent them.
+Each row shows how a specific attack is blocked by one or more invariants and the enforcement mechanism that makes the prevention work.
+
+### Primary Attack Prevention
+
+| Attack Class | Attacker Goal | Preventing Invariant(s) | Enforcement Mechanism |
+|--------------|---------------|-------------------------|------------------------|
+| **Prefix** | Prove partial execution, skip validation at step N | `INV_ATK_NoPrefixProof` | Halted flag semantics require `halted = 1` for completion; `status_fr` binding to exit_code ensures final state is checked |
+| **Skip** | Omit chunks to bypass authorization logic | `INV_ATK_NoSkipChunk` | Chunk index consecutiveness enforced; digest chaining breaks if any chunk is missing |
+| **Splice** | Combine chunks from different executions | `INV_ATK_NoSplice`, `INV_SAFE_ContinuationChain` | StateDigest binds `program_hash` into every chunk boundary; different programs produce different digests |
+| **Replay** | Resubmit old proofs for new transactions | `INV_ATK_NoReplay`, `INV_BIND_Nonce` | Batch nonce bound into StateDigest and public inputs; nonce uniqueness checked on-chain |
+| **Config swap** | Prove with loose parameters, verify with strict | `INV_ATK_NoCrossConfig`, `INV_BIND_ConfigTags` | Config tags bound into StateDigest; registry projection validated at every chunk boundary |
+
+### Memory and State Integrity
+
+| Attack Class | Attacker Goal | Preventing Invariant(s) | Enforcement Mechanism |
+|--------------|---------------|-------------------------|------------------------|
+| **Root forgery** | Claim false initial/final memory state | `INV_ATK_NoRootForgery`, `INV_BIND_OldRoot`, `INV_BIND_NewRoot` | SMT roots bound into public inputs; Poseidon collision resistance prevents forging matching roots |
+| **Memory forgery** | Manipulate R/W memory between chunks | `INV_ATK_NoMemoryForgery` | `rw_mem_root_bytes32` must match at chunk boundaries; enforced by StateDigest chaining |
+| **I/O forgery** | Manipulate input/output memory between chunks | `INV_ATK_NoIOForgery` | `io_root_bytes32` must match at chunk boundaries; enforced by StateDigest chaining |
+
+### Supporting Invariants
+
+These invariants do not directly prevent attacks but ensure the enforcement mechanisms work correctly:
+
+| Category | Invariant(s) | Role in Attack Prevention |
+|----------|--------------|---------------------------|
+| Type safety | `INV_TYPE_VMState`, `INV_TYPE_ProgramHash`, `INV_TYPE_PublicInputs` | Ensure well-formed inputs to digest computation; prevent type confusion attacks |
+| Binding correctness | `INV_BIND_StateDigest`, `INV_BIND_ProgramHash`, `INV_BIND_StatusFr` | Ensure public inputs correctly reflect execution state; prevent binding bypass |
+| Protocol correctness | `INV_SAFE_RegisterX0`, `INV_SAFE_HaltedBinary`, `INV_SAFE_VMHaltedExitCode` | Ensure VM semantics are valid; prevent invalid state transitions that could bypass checks |
+
+---
+
+## Continuation Integrity
+
+The continuation chain provides a cryptographic binding that unifies all chunks into a single execution context.
+This integrity is enforced collectively by the invariants listed above through the following mechanisms:
+
+**StateDigest as the core binding primitive.**
+Every chunk boundary is committed to by a StateDigest that includes:
+- Program identity (`program_hash`)
+- Execution position (`pc`, `step_counter`)
+- VM register state (`regs[0..31]`)
+- Memory commitments (`rw_mem_root`, `io_root`)
+- Configuration (`config_tags`)
+- Termination state (`halted`, `exit_code`)
+
+**Digest chaining enforces temporal ordering.**
+The constraint `chunk[i].digest_out = chunk[i+1].digest_in` ensures:
+- No chunks can be skipped (breaks the chain)
+- No chunks can be reordered (mismatched digests)
+- No chunks can be spliced from different executions (different program_hash)
+
+**Public input binding makes verification checkable.**
+All security-critical values are exposed as public inputs:
+- Initial and final memory roots (`old_root`, `new_root`)
+- Program identity (`program_hash`)
+- Execution outcome (`status_fr`)
+- Anti-replay nonce (`batch_nonce_fr`)
+
+Together, these mechanisms ensure that a valid proof represents exactly one complete execution of one program with no tampering at chunk boundaries.
+
+---
+
+## Scope Boundaries
+
+The formal specification and invariants cover continuation integrity and cryptographic binding.
+The following classes of threats are intentionally out of scope, as documented in the threat model:
+
+**Out of scope:**
+- Side-channel attacks on prover implementation (timing, power analysis)
+- Denial of service and resource exhaustion (liveness is verifier's responsibility)
+- Network-level attacks (eclipse, partition, routing)
+- Bugs in verification tools themselves (Lean compiler, TLC model checker)
+- Compromised verifier or malicious runtime environment
+- Physical attacks on hardware executing the prover or verifier
+
+**In scope:**
+- All attacks that attempt to produce invalid proofs that would be accepted by an honest verifier
+- Protocol-level attacks exploiting chunk boundaries, state transitions, or configuration mismatches
+- Cryptographic attacks within the security assumptions stated (Poseidon collision resistance, BLS12-381 discrete log hardness)
+
+For attacks involving a compromised verifier, the security model assumes the verifier correctly checks public inputs against the specification.

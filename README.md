@@ -157,6 +157,8 @@ Every attack produces a detectable inconsistency. The spec defines this algorith
 - Network-level attacks (eclipse, partition)
 - Bugs in the Lean compiler or TLC model checker
 
+**Security Coverage:** For a detailed mapping of how each attacker goal is prevented by specific formal invariants, see `docs/invariants.md` (Attack Coverage Matrix section).
+
 ---
 
 ## Why an Executable Spec Oracle?
